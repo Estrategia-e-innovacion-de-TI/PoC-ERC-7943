@@ -1,8 +1,7 @@
 import { HardhatUserConfig } from "hardhat/config";
-import "@nomicfoundation/hardhat-toolbox";
-import * as dotenv from "dotenv";
-
-dotenv.config();
+import "@nomicfoundation/hardhat-ethers";
+import "@nomicfoundation/hardhat-network-helpers";
+import "@nomicfoundation/hardhat-chai-matchers";
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -18,11 +17,6 @@ const config: HardhatUserConfig = {
     hardhat: {
       chainId: 31337,
     },
-    // Uncomment to deploy to a live network:
-    // sepolia: {
-    //   url: process.env.RPC_URL || "",
-    //   accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
-    // },
   },
 };
 

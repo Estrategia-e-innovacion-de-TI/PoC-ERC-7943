@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SimpleToken Demo</title>
+</head>
+<body>
+  <h1>SimpleToken (demo minima)</h1>
+
+  <p>
+    1) Conecta MetaMask
+    <button id="btnConnect">Connect</button>
+  </p>
+
+  <p>
+    2) Cambia a red Hardhat 31337
+    <button id="btnSwitch">Switch network</button>
+  </p>
+
+  <p>
+    3) Carga ultimo deploy
+    <button id="btnLoadDeploy">Load deploy</button>
+  </p>
+
+  <p>
+    Wallet: <input id="wallet" size="50" readonly />
+  </p>
+
+  <p>
+    Contract: <input id="contract" size="50" placeholder="0x..." />
+  </p>
+
+  <hr />
+
+  <h2>Read</h2>
+  <p><button id="btnRefresh">Refresh token info</button></p>
+  <pre id="out">No data yet.</pre>
+
+  <h2>Transfer</h2>
+  <p>
+    To: <input id="transferTo" size="50" placeholder="0x..." />
+  </p>
+  <p>
+    Amount (token units): <input id="transferAmount" placeholder="ej: 1.5" />
+  </p>
+  <p><button id="btnTransfer">Send transfer</button></p>
+
+  <h2>Mint (solo owner)</h2>
+  <p>
+    To: <input id="mintTo" size="50" placeholder="0x..." />
+  </p>
+  <p>
+    Amount (token units): <input id="mintAmount" placeholder="ej: 100" />
+  </p>
+  <p><button id="btnMint">Send mint</button></p>
+
+  <hr />
+  <p>Status:</p>
+  <pre id="status">Ready.</pre>
+
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
+  <script>
+    const ABI = [
+      "function name() view returns (string)",
+      "function symbol() view returns (string)",
+      "function decimals() view returns (uint8)",
+      "function totalSupply() view returns (uint256)",
+      "function balanceOf(address) view returns (uint256)",
+      "function owner() view returns (address)",
+      "function transfer(address to, uint256 value) returns (bool)",
+      "function mint(address to, uint256 amount)",
+    ];
+
+    const el = {
+      wallet: document.getElementById("wallet"),
+      contract: document.getElementById("contract"),
+      out: document.getElementById("out"),
+      status: document.getElementById("status"),
+      transferTo: document.getElementById("transferTo"),
+      transferAmount: document.getElementById("transferAmount"),
+      mintTo: document.getElementById("mintTo"),
+      mintAmount: document.getElementById("mintAmount"),
+    };
+
+    let provider;
+    let signer;
+    let currentAddress;
+
+    function setStatus(message) {
+      el.status.textContent = String(message);
+    }
+
+    function getEthereum() {
+      if (!window.ethereum) {
+        throw new Error("MetaMask not found");
+      }
+      return window.ethereum;
+    }
+
+    async function connectWallet() {
+      const eth = getEthereum();
+      provider = new ethers.BrowserProvider(eth);
+      const accounts = await eth.request({ method: "eth_requestAccounts" });
+      signer = await provider.getSigner();
+      currentAddress = accounts[0];
+      el.wallet.value = currentAddress;
+      setStatus("Wallet connected");
+    }
+
+    async function switchToHardhatNetwork() {
+      const eth = getEthereum();
+      const chainIdHex = "0x7A69";
+
+      try {
+        await eth.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: chainIdHex }],
+        });
+        setStatus("Switched to Hardhat network");
+      } catch (err) {
+        if (err && err.code === 4902) {
+          await eth.request({
+            method: "wallet_addEthereumChain",
+            params: [{
+              chainId: chainIdHex,
+              chainName: "Hardhat Local",
+              nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+              rpcUrls: ["http://127.0.0.1:8545"],
+            }],
+          });
+          setStatus("Hardhat network added");
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    function getContractAddress() {
+      const addr = el.contract.value.trim();
+      if (!ethers.isAddress(addr)) {
+        throw new Error("Invalid contract address");
+      }
+      return addr;
+    }
+
+    async function getContract(withSigner) {
+      const addr = getContractAddress();
+      if (!provider) {
+        provider = new ethers.BrowserProvider(getEthereum());
+      }
+      const runner = withSigner ? (signer || await provider.getSigner()) : provider;
+      return new ethers.Contract(addr, ABI, runner);
+    }
+
+    async function loadLatestDeploy() {
+      const res = await fetch("/last-deploy.json", { cache: "no-store" });
+      if (!res.ok) {
+        throw new Error("No last-deploy.json. Run deploy:local first.");
+      }
+
+      const data = await res.json();
+      if (!ethers.isAddress(data.address)) {
+        throw new Error("last-deploy.json is invalid");
+      }
+
+      el.contract.value = data.address;
+      setStatus("Contract loaded from last-deploy.json");
+    }
+
+    async function refreshInfo() {
+      const token = await getContract(false);
+      const [name, symbol, decimals, totalSupply, owner] = await Promise.all([
+        token.name(),
+        token.symbol(),
+        token.decimals(),
+        token.totalSupply(),
+        token.owner(),
+      ]);
+
+      let balance = "Connect wallet first";
+      if (currentAddress && ethers.isAddress(currentAddress)) {
+        const rawBalance = await token.balanceOf(currentAddress);
+        balance = ethers.formatUnits(rawBalance, decimals);
+      }
+
+      el.out.textContent = [
+        `name: ${name}`,
+        `symbol: ${symbol}`,
+        `decimals: ${decimals}`,
+        `totalSupply: ${ethers.formatUnits(totalSupply, decimals)}`,
+        `owner: ${owner}`,
+        `myBalance: ${balance}`,
+      ].join("\n");
+
+      setStatus("Info refreshed");
+    }
+
+    async function sendTransfer() {
+      const to = el.transferTo.value.trim();
+      const amount = el.transferAmount.value.trim();
+      if (!ethers.isAddress(to)) throw new Error("Invalid transfer address");
+      if (!amount) throw new Error("Missing transfer amount");
+
+      const token = await getContract(true);
+      const decimals = await token.decimals();
+      const parsed = ethers.parseUnits(amount, decimals);
+
+      const tx = await token.transfer(to, parsed);
+      setStatus(`Transfer sent: ${tx.hash}`);
+      await tx.wait();
+      setStatus("Transfer confirmed");
+      await refreshInfo();
+    }
+
+    async function sendMint() {
+      const to = el.mintTo.value.trim();
+      const amount = el.mintAmount.value.trim();
+      if (!ethers.isAddress(to)) throw new Error("Invalid mint address");
+      if (!amount) throw new Error("Missing mint amount");
+
+      const token = await getContract(true);
+      const tx = await token.mint(to, amount);
+      setStatus(`Mint sent: ${tx.hash}`);
+      await tx.wait();
+      setStatus("Mint confirmed");
+      await refreshInfo();
+    }
+
+    function bind(id, handler) {
+      document.getElementById(id).addEventListener("click", async () => {
+        try {
+          await handler();
+        } catch (err) {
+          setStatus(err && err.message ? err.message : String(err));
+        }
+      });
+    }
+
+    bind("btnConnect", connectWallet);
+    bind("btnSwitch", switchToHardhatNetwork);
+    bind("btnLoadDeploy", loadLatestDeploy);
+    bind("btnRefresh", refreshInfo);
+    bind("btnTransfer", sendTransfer);
+    bind("btnMint", sendMint);
+  </script>
+</body>
+</html>

@@ -1,89 +1,61 @@
-# PoC — ERC-7943 uRWA (Universal Real World Asset)
+# Hardhat local + frontend HTML minimo
 
-Skeleton de un proyecto Hardhat en TypeScript como punto de partida para implementar el estándar [ERC-7943](https://eips.ethereum.org/EIPS/eip-7943).
+Proyecto reducido al minimo para interactuar con `SimpleToken` en red local de Hardhat.
 
 ## Requisitos
 
-- [Node.js](https://nodejs.org/) v18 o superior
-- npm v9 o superior
+- Node.js 18+
+- npm 9+
+- MetaMask
 
-## Instalación
+## Instalacion
 
 ```bash
 npm install
 ```
 
-## Comandos
+## Flujo rapido
 
-### Compilar contratos
-
-```bash
-npm run compile
-```
-
-### Correr los tests
-
-```bash
-npm test
-```
-
-### Levantar la red local de Hardhat
-
-Inicia un nodo JSON-RPC local en `http://127.0.0.1:8545` con 20 cuentas prefinanciadas. Útil para conectar MetaMask o herramientas externas.
+1. Levanta el nodo local de Hardhat:
 
 ```bash
 npm run node
 ```
 
-### Deploy en la red local de Hardhat
-
-**Opción A — red efímera en memoria** (sin nodo corriendo, más rápido):
-
-```bash
-npm run deploy
-```
-
-**Opción B — contra el nodo local** (requiere `npm run node` corriendo en otra terminal):
+2. En otra terminal, despliega el contrato al nodo local:
 
 ```bash
 npm run deploy:local
 ```
 
-## Estructura del proyecto
+3. Levanta el frontend estatico:
 
-```
-├── contracts/
-│   └── SimpleToken.sol       # Placeholder ERC-20. Aquí se implementará ERC-7943
-├── scripts/
-│   └── deploy.ts             # Script de deploy
-├── test/
-│   └── SimpleToken.test.ts   # Tests del contrato
-├── .env.example              # Variables de entorno para redes live
-├── hardhat.config.ts
-├── package.json
-└── tsconfig.json
+```bash
+npm run front
 ```
 
-## Deploy en una red live (opcional)
+4. Abre en el navegador:
 
-1. Copia `.env.example` a `.env`:
+```text
+http://127.0.0.1:5500
+```
 
-   ```bash
-   cp .env.example .env
-   ```
+5. En la pagina:
 
-2. Rellena `PRIVATE_KEY` y `RPC_URL` en el archivo `.env`.
+- Conecta MetaMask
+- Cambia a red Hardhat (chainId 31337)
+- Carga el ultimo deploy
+- Usa refresh, transfer y mint
 
-3. Descomenta la red correspondiente en `hardhat.config.ts` (por ejemplo `sepolia`).
+## Scripts
 
-4. Ejecuta el deploy indicando la red:
+- `npm run compile`: compila contratos
+- `npm test`: ejecuta tests
+- `npm run node`: inicia red local Hardhat
+- `npm run deploy`: deploy en red temporal en memoria
+- `npm run deploy:local`: deploy contra localhost:8545
+- `npm run front`: servidor HTTP del frontend
 
-   ```bash
-   npx hardhat run scripts/deploy.ts --network sepolia
-   ```
+## Nota MetaMask
 
-## Próximos pasos
-
-- Agregar la interfaz `IERC7943Fungible` en `contracts/interfaces/`
-- Extender `SimpleToken` implementando las funciones del estándar: `canSend`, `canReceive`, `canTransfer`, `getFrozenTokens`, `setFrozenTokens`, `forcedTransfer`
-- Ampliar los tests para cubrir los casos de compliance del ERC-7943
+Para firmar en local, importa en MetaMask una clave privada de las cuentas que imprime `npm run node`.
