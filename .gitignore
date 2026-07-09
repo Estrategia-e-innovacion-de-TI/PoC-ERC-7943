@@ -6,6 +6,7 @@ artifacts/
 cache/
 typechain-types/
 frontend/last-deploy.json
+frontend/asset-shares-last-deploy.json
 
 # Coverage reports
 coverage/

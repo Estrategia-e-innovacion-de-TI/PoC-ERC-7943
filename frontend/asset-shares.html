@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AssetShares Demo (ERC-7943 PoC)</title>
+</head>
+<body>
+  <h1>AssetShares (PoC ERC-7943 / uRWA)</h1>
+
+  <p>
+    1) Conecta MetaMask
+    <button id="btnConnect">Connect</button>
+  </p>
+
+  <p>
+    2) Cambia a red Hardhat 31337
+    <button id="btnSwitch">Switch network</button>
+  </p>
+
+  <p>
+    3) Carga ultimo deploy
+    <button id="btnLoadDeploy">Load deploy</button>
+  </p>
+
+  <p>
+    Wallet: <input id="wallet" size="50" readonly />
+  </p>
+
+  <p>
+    Contract: <input id="contract" size="50" placeholder="0x..." />
+  </p>
+
+  <hr />
+
+  <h2>Estado del activo</h2>
+  <p><button id="btnRefresh">Refresh info</button></p>
+  <pre id="out">No data yet.</pre>
+
+  <hr />
+
+  <h2>Escenario 1: Tokenizar el activo</h2>
+  <p>
+    Nombre del activo: <input id="createName" placeholder="Bono Demo" /><br />
+    Total shares: <input id="createTotalShares" placeholder="1000" /><br />
+    Fecha de vencimiento: <input id="createMaturity" type="datetime-local" /><br />
+    Document hash: <input id="createDocHash" size="50" placeholder="ipfs://..." />
+  </p>
+  <p><button id="btnCreateAsset">1a. createAsset</button></p>
+
+  <p><button id="btnActivateAsset">1b. activateAsset</button></p>
+
+  <p>
+    Para: <input id="issueTo" size="50" placeholder="0x..." />
+    Cantidad: <input id="issueAmount" placeholder="100" />
+  </p>
+  <p><button id="btnIssueShares">1c. issueShares</button></p>
+
+  <hr />
+
+  <h2>Escenario 2: Comercializacion entre inversionistas aprobados</h2>
+  <p>
+    Investor: <input id="approveInvestor" size="50" placeholder="0x..." />
+  </p>
+  <p><button id="btnApproveInvestor">2a. approveInvestor</button></p>
+
+  <p>
+    Para: <input id="transferTo" size="50" placeholder="0x..." />
+    Cantidad: <input id="transferAmount" placeholder="20" />
+  </p>
+  <p><button id="btnTransferShares">2b. transferShares (desde wallet conectada)</button></p>
+
+  <hr />
+
+  <h2>Escenario 3: Congelamiento de tokens</h2>
+  <p>
+    Investor: <input id="freezeInvestor" size="50" placeholder="0x..." />
+    Cantidad congelada: <input id="freezeAmount" placeholder="80" />
+  </p>
+  <p><button id="btnSetFrozen">3a. setFrozenTokens</button></p>
+  <p><button id="btnGetFrozen">3b. getFrozenTokens</button></p>
+  <pre id="frozenOut">-</pre>
+
+  <hr />
+
+  <h2>Escenario 4: Transferencia forzada</h2>
+  <p>
+    Investor a bloquear: <input id="blockInvestor" size="50" placeholder="0x..." />
+  </p>
+  <p><button id="btnBlockInvestor">4a. blockInvestor</button></p>
+
+  <p>
+    Desde: <input id="forcedFrom" size="50" placeholder="0x..." /><br />
+    Hacia: <input id="forcedTo" size="50" placeholder="0x..." /><br />
+    Cantidad: <input id="forcedAmount" placeholder="50" /><br />
+    Razon: <input id="forcedReason" size="50" placeholder="orden judicial" />
+  </p>
+  <p><button id="btnForcedTransfer">4b. forcedTransfer (solo owner)</button></p>
+
+  <hr />
+
+  <h2>Escenario 5: Vencimiento del activo</h2>
+  <p><button id="btnMarkMatured">5. markMatured</button></p>
+
+  <hr />
+  <p>Status:</p>
+  <pre id="status">Ready.</pre>
+
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
+  <script>
+    const ABI = [
+      "function name() view returns (string)",
+      "function symbol() view returns (string)",
+      "function decimals() view returns (uint8)",
+      "function totalSupply() view returns (uint256)",
+      "function balanceOf(address) view returns (uint256)",
+      "function owner() view returns (address)",
+      "function assetName() view returns (string)",
+      "function totalShares() view returns (uint256)",
+      "function issuedShares() view returns (uint256)",
+      "function maturityDate() view returns (uint256)",
+      "function documentHash() view returns (string)",
+      "function assetStatus() view returns (uint8)",
+      "function approvedInvestor(address) view returns (bool)",
+      "function blockedInvestor(address) view returns (bool)",
+      "function frozenTokens(address) view returns (uint256)",
+      "function createAsset(string name, uint256 totalShares, uint256 maturityDate, string documentHash)",
+      "function activateAsset()",
+      "function approveInvestor(address investor)",
+      "function blockInvestor(address investor)",
+      "function issueShares(address to, uint256 amount)",
+      "function transferShares(address to, uint256 amount) returns (bool)",
+      "function setFrozenTokens(address investor, uint256 amount)",
+      "function getFrozenTokens(address investor) view returns (uint256)",
+      "function forcedTransfer(address from, address to, uint256 amount, string reason) returns (bool)",
+      "function markMatured()",
+    ];
+
+    const ASSET_STATUS_LABELS = ["NotCreated", "Created", "Active", "Matured", "Cancelled"];
+
+    const el = {
+      wallet: document.getElementById("wallet"),
+      contract: document.getElementById("contract"),
+      out: document.getElementById("out"),
+      status: document.getElementById("status"),
+      frozenOut: document.getElementById("frozenOut"),
+
+      createName: document.getElementById("createName"),
+      createTotalShares: document.getElementById("createTotalShares"),
+      createMaturity: document.getElementById("createMaturity"),
+      createDocHash: document.getElementById("createDocHash"),
+
+      issueTo: document.getElementById("issueTo"),
+      issueAmount: document.getElementById("issueAmount"),
+
+      approveInvestor: document.getElementById("approveInvestor"),
+
+      transferTo: document.getElementById("transferTo"),
+      transferAmount: document.getElementById("transferAmount"),
+
+      freezeInvestor: document.getElementById("freezeInvestor"),
+      freezeAmount: document.getElementById("freezeAmount"),
+
+      blockInvestor: document.getElementById("blockInvestor"),
+
+      forcedFrom: document.getElementById("forcedFrom"),
+      forcedTo: document.getElementById("forcedTo"),
+      forcedAmount: document.getElementById("forcedAmount"),
+      forcedReason: document.getElementById("forcedReason"),
+    };
+
+    let provider;
+    let signer;
+    let currentAddress;
+
+    function setStatus(message) {
+      el.status.textContent = String(message);
+    }
+
+    function getEthereum() {
+      if (!window.ethereum) {
+        throw new Error("MetaMask not found");
+      }
+      return window.ethereum;
+    }
+
+    async function connectWallet() {
+      const eth = getEthereum();
+      provider = new ethers.BrowserProvider(eth);
+      const accounts = await eth.request({ method: "eth_requestAccounts" });
+      signer = await provider.getSigner();
+      currentAddress = accounts[0];
+      el.wallet.value = currentAddress;
+      setStatus("Wallet connected");
+    }
+
+    async function switchToHardhatNetwork() {
+      const eth = getEthereum();
+      const chainIdHex = "0x7A69";
+
+      try {
+        await eth.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: chainIdHex }],
+        });
+        setStatus("Switched to Hardhat network");
+      } catch (err) {
+        if (err && err.code === 4902) {
+          await eth.request({
+            method: "wallet_addEthereumChain",
+            params: [{
+              chainId: chainIdHex,
+              chainName: "Hardhat Local",
+              nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+              rpcUrls: ["http://127.0.0.1:8545"],
+            }],
+          });
+          setStatus("Hardhat network added");
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    function getContractAddress() {
+      const addr = el.contract.value.trim();
+      if (!ethers.isAddress(addr)) {
+        throw new Error("Invalid contract address");
+      }
+      return addr;
+    }
+
+    async function getContract(withSigner) {
+      const addr = getContractAddress();
+      if (!provider) {
+        provider = new ethers.BrowserProvider(getEthereum());
+      }
+      const runner = withSigner ? (signer || await provider.getSigner()) : provider;
+      return new ethers.Contract(addr, ABI, runner);
+    }
+
+    async function loadLatestDeploy() {
+      const res = await fetch("/asset-shares-last-deploy.json", { cache: "no-store" });
+      if (!res.ok) {
+        throw new Error("No asset-shares-last-deploy.json. Run deploy-assetshares first.");
+      }
+
+      const data = await res.json();
+      if (!ethers.isAddress(data.address)) {
+        throw new Error("asset-shares-last-deploy.json is invalid");
+      }
+
+      el.contract.value = data.address;
+      setStatus("Contract loaded from asset-shares-last-deploy.json");
+    }
+
+    function formatMaturity(maturityDate) {
+      const ts = Number(maturityDate);
+      if (!ts) return "not set";
+      return new Date(ts * 1000).toISOString();
+    }
+
+    async function refreshInfo() {
+      const token = await getContract(false);
+      const [
+        name,
+        symbol,
+        assetName,
+        totalShares,
+        issuedShares,
+        maturityDate,
+        documentHash,
+        assetStatus,
+        owner,
+      ] = await Promise.all([
+        token.name(),
+        token.symbol(),
+        token.assetName(),
+        token.totalShares(),
+        token.issuedShares(),
+        token.maturityDate(),
+        token.documentHash(),
+        token.assetStatus(),
+        token.owner(),
+      ]);
+
+      let balance = "Connect wallet first";
+      if (currentAddress && ethers.isAddress(currentAddress)) {
+        balance = (await token.balanceOf(currentAddress)).toString();
+      }
+
+      el.out.textContent = [
+        `name: ${name}`,
+        `symbol: ${symbol}`,
+        `assetName: ${assetName}`,
+        `totalShares: ${totalShares}`,
+        `issuedShares: ${issuedShares}`,
+        `maturityDate: ${formatMaturity(maturityDate)}`,
+        `documentHash: ${documentHash}`,
+        `assetStatus: ${ASSET_STATUS_LABELS[Number(assetStatus)]}`,
+        `owner: ${owner}`,
+        `myBalance: ${balance}`,
+      ].join("\n");
+
+      setStatus("Info refreshed");
+    }
+
+    async function createAsset() {
+      const name = el.createName.value.trim();
+      const totalShares = el.createTotalShares.value.trim();
+      const maturityLocal = el.createMaturity.value;
+      const documentHash = el.createDocHash.value.trim();
+
+      if (!name) throw new Error("Missing asset name");
+      if (!totalShares) throw new Error("Missing total shares");
+      if (!maturityLocal) throw new Error("Missing maturity date");
+      if (!documentHash) throw new Error("Missing document hash");
+
+      const maturityTs = Math.floor(new Date(maturityLocal).getTime() / 1000);
+
+      const token = await getContract(true);
+      const tx = await token.createAsset(name, totalShares, maturityTs, documentHash);
+      setStatus(`createAsset sent: ${tx.hash}`);
+      await tx.wait();
+      setStatus("createAsset confirmed");
+      await refreshInfo();
+    }
+
+    async function activateAsset() {
+      const token = await getContract(true);
+      const tx = await token.activateAsset();
+      setStatus(`activateAsset sent: ${tx.hash}`);
+      await tx.wait();
+      setStatus("activateAsset confirmed");
+      await refreshInfo();
+    }
+
+    async function issueShares() {
+      const to = el.issueTo.value.trim();
+      const amount = el.issueAmount.value.trim();
+      if (!ethers.isAddress(to)) throw new Error("Invalid issue address");
+      if (!amount) throw new Error("Missing issue amount");
+
+      const token = await getContract(true);
+      const tx = await token.issueShares(to, amount);
+      setStatus(`issueShares sent: ${tx.hash}`);
+      await tx.wait();
+      setStatus("issueShares confirmed");
+      await refreshInfo();
+    }
+
+    async function approveInvestor() {
+      const investor = el.approveInvestor.value.trim();
+      if (!ethers.isAddress(investor)) throw new Error("Invalid investor address");
+
+      const token = await getContract(true);
+      const tx = await token.approveInvestor(investor);
+      setStatus(`approveInvestor sent: ${tx.hash}`);
+      await tx.wait();
+      setStatus("approveInvestor confirmed");
+    }
+
+    async function transferShares() {
+      const to = el.transferTo.value.trim();
+      const amount = el.transferAmount.value.trim();
+      if (!ethers.isAddress(to)) throw new Error("Invalid transfer address");
+      if (!amount) throw new Error("Missing transfer amount");
+
+      const token = await getContract(true);
+      const tx = await token.transferShares(to, amount);
+      setStatus(`transferShares sent: ${tx.hash}`);
+      await tx.wait();
+      setStatus("transferShares confirmed");
+      await refreshInfo();
+    }
+
+    async function setFrozenTokens() {
+      const investor = el.freezeInvestor.value.trim();
+      const amount = el.freezeAmount.value.trim();
+      if (!ethers.isAddress(investor)) throw new Error("Invalid investor address");
+      if (!amount) throw new Error("Missing freeze amount");
+
+      const token = await getContract(true);
+      const tx = await token.setFrozenTokens(investor, amount);
+      setStatus(`setFrozenTokens sent: ${tx.hash}`);
+      await tx.wait();
+      setStatus("setFrozenTokens confirmed");
+    }
+
+    async function getFrozenTokens() {
+      const investor = el.freezeInvestor.value.trim();
+      if (!ethers.isAddress(investor)) throw new Error("Invalid investor address");
+
+      const token = await getContract(false);
+      const frozen = await token.getFrozenTokens(investor);
+      el.frozenOut.textContent = `frozenTokens[${investor}] = ${frozen}`;
+    }
+
+    async function blockInvestor() {
+      const investor = el.blockInvestor.value.trim();
+      if (!ethers.isAddress(investor)) throw new Error("Invalid investor address");
+
+      const token = await getContract(true);
+      const tx = await token.blockInvestor(investor);
+      setStatus(`blockInvestor sent: ${tx.hash}`);
+      await tx.wait();
+      setStatus("blockInvestor confirmed");
+    }
+
+    async function forcedTransfer() {
+      const from = el.forcedFrom.value.trim();
+      const to = el.forcedTo.value.trim();
+      const amount = el.forcedAmount.value.trim();
+      const reason = el.forcedReason.value.trim() || "forced transfer";
+      if (!ethers.isAddress(from)) throw new Error("Invalid from address");
+      if (!ethers.isAddress(to)) throw new Error("Invalid to address");
+      if (!amount) throw new Error("Missing amount");
+
+      const token = await getContract(true);
+      const tx = await token.forcedTransfer(from, to, amount, reason);
+      setStatus(`forcedTransfer sent: ${tx.hash}`);
+      await tx.wait();
+      setStatus("forcedTransfer confirmed");
+      await refreshInfo();
+    }
+
+    async function markMatured() {
+      const token = await getContract(true);
+      const tx = await token.markMatured();
+      setStatus(`markMatured sent: ${tx.hash}`);
+      await tx.wait();
+      setStatus("markMatured confirmed");
+      await refreshInfo();
+    }
+
+    function bind(id, handler) {
+      document.getElementById(id).addEventListener("click", async () => {
+        try {
+          await handler();
+        } catch (err) {
+          setStatus(err && err.message ? err.message : String(err));
+        }
+      });
+    }
+
+    bind("btnConnect", connectWallet);
+    bind("btnSwitch", switchToHardhatNetwork);
+    bind("btnLoadDeploy", loadLatestDeploy);
+    bind("btnRefresh", refreshInfo);
+
+    bind("btnCreateAsset", createAsset);
+    bind("btnActivateAsset", activateAsset);
+    bind("btnIssueShares", issueShares);
+
+    bind("btnApproveInvestor", approveInvestor);
+    bind("btnTransferShares", transferShares);
+
+    bind("btnSetFrozen", setFrozenTokens);
+    bind("btnGetFrozen", getFrozenTokens);
+
+    bind("btnBlockInvestor", blockInvestor);
+    bind("btnForcedTransfer", forcedTransfer);
+
+    bind("btnMarkMatured", markMatured);
+  </script>
+</body>
+</html>
