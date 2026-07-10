@@ -9,6 +9,7 @@ describe("AssetShares", function () {
   let token: any;
 
   const DOCUMENT_HASH = "ipfs://document-hash";
+  const ERC7943_FUNGIBLE_INTERFACE_ID = "0x3edbb4c4";
 
   beforeEach(async function () {
     [owner, a, b] = await ethers.getSigners();
@@ -22,6 +23,29 @@ describe("AssetShares", function () {
     const latest = await time.latest();
     return latest + daysAhead * 24 * 60 * 60;
   }
+
+  describe("Conformidad ERC-7943", function () {
+    it("supportsInterface reporta el interfaceId fungible del EIP", async function () {
+      expect(await token.supportsInterface(ERC7943_FUNGIBLE_INTERFACE_ID)).to.equal(true);
+    });
+
+    it("supportsInterface rechaza el identificador reservado 0xffffffff", async function () {
+      expect(await token.supportsInterface("0xffffffff")).to.equal(false);
+    });
+
+    it("canTransfer no revierte aunque lo congelado supere el balance actual", async function () {
+      const maturityDate = await futureMaturity();
+      await token.createAsset("Bono Demo", 1000, maturityDate, DOCUMENT_HASH);
+      await token.activateAsset();
+      await token.approveInvestor(a.address);
+      await token.approveInvestor(b.address);
+      await token.issueShares(a.address, 50);
+
+      await token.setFrozenTokens(a.address, 999); // mas que el balance
+
+      expect(await token.canTransfer(a.address, b.address, 1)).to.equal(false);
+    });
+  });
 
   describe("Escenario 1: tokenizar el activo", function () {
     it("createAsset -> activateAsset -> issueShares", async function () {
@@ -65,9 +89,9 @@ describe("AssetShares", function () {
       await token.approveInvestor(a.address);
       await token.issueShares(a.address, 100);
 
-      await expect(token.connect(a).transferShares(b.address, 20)).to.be.revertedWith(
-        "Transfer not allowed"
-      );
+      await expect(token.connect(a).transferShares(b.address, 20))
+        .to.be.revertedWithCustomError(token, "ERC7943CannotReceive")
+        .withArgs(b.address);
     });
   });
 
@@ -83,9 +107,9 @@ describe("AssetShares", function () {
 
       await token.setFrozenTokens(a.address, 80);
 
-      await expect(token.connect(a).transferShares(b.address, 100)).to.be.revertedWith(
-        "Transfer not allowed"
-      );
+      await expect(token.connect(a).transferShares(b.address, 100))
+        .to.be.revertedWithCustomError(token, "ERC7943InsufficientUnfrozenBalance")
+        .withArgs(a.address, 100, 20);
 
       // Pero si transfiere solo lo disponible (100 - 80), si funciona.
       await token.connect(a).transferShares(b.address, 20);
@@ -105,9 +129,29 @@ describe("AssetShares", function () {
 
       await token.blockInvestor(a.address);
 
-      await token.forcedTransfer(a.address, b.address, 50, "orden judicial");
+      await token.forcedTransfer(a.address, b.address, 50);
 
       expect(await token.balanceOf(a.address)).to.equal(50);
+      expect(await token.balanceOf(b.address)).to.equal(50);
+    });
+
+    it("forcedTransferWithReason hace lo mismo y ademas deja el motivo en el evento", async function () {
+      const maturityDate = await futureMaturity();
+      await token.createAsset("Bono Demo", 1000, maturityDate, DOCUMENT_HASH);
+      await token.activateAsset();
+
+      await token.approveInvestor(a.address);
+      await token.approveInvestor(b.address);
+      await token.issueShares(a.address, 100);
+
+      await token.blockInvestor(a.address);
+
+      await expect(token.forcedTransferWithReason(a.address, b.address, 50, "orden judicial"))
+        .to.emit(token, "ForcedTransfer")
+        .withArgs(a.address, b.address, 50)
+        .and.to.emit(token, "ForcedTransferReason")
+        .withArgs(a.address, b.address, 50, "orden judicial");
+
       expect(await token.balanceOf(b.address)).to.equal(50);
     });
 
@@ -121,7 +165,7 @@ describe("AssetShares", function () {
       await token.issueShares(a.address, 100);
 
       await expect(
-        token.connect(a).forcedTransfer(a.address, b.address, 50, "orden judicial")
+        token.connect(a).forcedTransfer(a.address, b.address, 50)
       ).to.be.revertedWithCustomError(token, "OwnableUnauthorizedAccount");
     });
   });
@@ -152,9 +196,9 @@ describe("AssetShares", function () {
       await time.increaseTo(maturityDate + 1);
       await token.markMatured();
 
-      await expect(token.connect(a).transferShares(b.address, 10)).to.be.revertedWith(
-        "Transfer not allowed"
-      );
+      await expect(token.connect(a).transferShares(b.address, 10))
+        .to.be.revertedWithCustomError(token, "ERC7943CannotSend")
+        .withArgs(a.address);
     });
   });
 });

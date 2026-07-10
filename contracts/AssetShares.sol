@@ -3,8 +3,17 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 
-contract AssetShares is ERC20, Ownable {
+/**
+ * @title AssetShares
+ * @notice RWA share token implementing the ERC-7943 (uRWA) fungible interface:
+ *         https://eips.ethereum.org/EIPS/eip-7943
+ */
+contract AssetShares is ERC20, Ownable, ERC165 {
+    // ERC-7943 fungible interfaceId, per the EIP.
+    bytes4 private constant _INTERFACE_ID_ERC7943_FUNGIBLE = 0x3edbb4c4;
+
     enum AssetStatus {
         NotCreated,
         Created,
@@ -32,8 +41,14 @@ contract AssetShares is ERC20, Ownable {
     event InvestorBlocked(address indexed investor);
     event SharesIssued(address indexed to, uint256 amount);
     event Frozen(address indexed account, uint256 amount);
-    event ForcedTransfer(address indexed from, address indexed to, uint256 amount, string reason);
+    event ForcedTransfer(address indexed from, address indexed to, uint256 amount);
+    event ForcedTransferReason(address indexed from, address indexed to, uint256 amount, string reason);
     event AssetMatured();
+
+    error ERC7943CannotSend(address account);
+    error ERC7943CannotReceive(address account);
+    error ERC7943CannotTransfer(address from, address to, uint256 amount);
+    error ERC7943InsufficientUnfrozenBalance(address account, uint256 amount, uint256 unfrozen);
 
     constructor(
         string memory tokenName,
@@ -110,12 +125,21 @@ contract AssetShares is ERC20, Ownable {
         if (amount == 0) return false;
         if (!canSend(from)) return false;
         if (!canReceive(to)) return false;
-        if (balanceOf(from) < amount) return false;
 
-        uint256 availableBalance = balanceOf(from) - frozenTokens[from];
+        uint256 balance = balanceOf(from);
+        if (balance < amount) return false;
+
+        // Frozen amount MAY exceed the current balance (per ERC-7943), so this
+        // must saturate at zero instead of underflowing.
+        uint256 frozen = frozenTokens[from];
+        uint256 availableBalance = frozen >= balance ? 0 : balance - frozen;
         if (availableBalance < amount) return false;
 
         return true;
+    }
+
+    function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {
+        return interfaceId == _INTERFACE_ID_ERC7943_FUNGIBLE || super.supportsInterface(interfaceId);
     }
 
     function issueShares(address to, uint256 amount) external onlyOwner {
@@ -135,24 +159,36 @@ contract AssetShares is ERC20, Ownable {
         return true;
     }
 
-    function setFrozenTokens(address investor, uint256 amount) external onlyOwner {
+    function setFrozenTokens(address investor, uint256 amount) external onlyOwner returns (bool) {
         require(investor != address(0), "Invalid investor");
 
         frozenTokens[investor] = amount;
 
         emit Frozen(investor, amount);
+
+        return true;
     }
 
     function getFrozenTokens(address investor) external view returns (uint256) {
         return frozenTokens[investor];
     }
 
-    function forcedTransfer(
+    function forcedTransfer(address from, address to, uint256 amount) external onlyOwner returns (bool) {
+        return _executeForcedTransfer(from, to, amount);
+    }
+
+    function forcedTransferWithReason(
         address from,
         address to,
         uint256 amount,
-        string memory reason
+        string calldata reason
     ) external onlyOwner returns (bool) {
+        bool ok = _executeForcedTransfer(from, to, amount);
+        emit ForcedTransferReason(from, to, amount, reason);
+        return ok;
+    }
+
+    function _executeForcedTransfer(address from, address to, uint256 amount) internal returns (bool) {
         require(amount > 0, "Amount must be greater than zero");
         require(balanceOf(from) >= amount, "Insufficient balance");
         require(canReceive(to), "Receiver cannot receive shares");
@@ -168,7 +204,7 @@ contract AssetShares is ERC20, Ownable {
         _update(from, to, amount);
         _forcedTransferInProgress = false;
 
-        emit ForcedTransfer(from, to, amount, reason);
+        emit ForcedTransfer(from, to, amount);
 
         return true;
     }
@@ -184,7 +220,17 @@ contract AssetShares is ERC20, Ownable {
 
     function _update(address from, address to, uint256 amount) internal override {
         if (from != address(0) && to != address(0) && !_forcedTransferInProgress) {
-            require(canTransfer(from, to, amount), "Transfer not allowed");
+            if (!canSend(from)) revert ERC7943CannotSend(from);
+            if (!canReceive(to)) revert ERC7943CannotReceive(to);
+
+            uint256 balance = balanceOf(from);
+            uint256 frozen = frozenTokens[from];
+            uint256 availableBalance = frozen >= balance ? 0 : balance - frozen;
+            if (amount > availableBalance) {
+                revert ERC7943InsufficientUnfrozenBalance(from, amount, availableBalance);
+            }
+
+            if (!canTransfer(from, to, amount)) revert ERC7943CannotTransfer(from, to, amount);
         }
 
         super._update(from, to, amount);

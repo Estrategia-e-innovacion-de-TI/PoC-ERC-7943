@@ -24,6 +24,11 @@
   </p>
 
   <p>
+    4) Verifica conformidad ERC-7943 (ERC-165)
+    <button id="btnCheckErc7943">supportsInterface(0x3edbb4c4)</button>
+  </p>
+
+  <p>
     Wallet: <input id="wallet" size="50" readonly />
   </p>
 
@@ -130,11 +135,15 @@
       "function blockInvestor(address investor)",
       "function issueShares(address to, uint256 amount)",
       "function transferShares(address to, uint256 amount) returns (bool)",
-      "function setFrozenTokens(address investor, uint256 amount)",
+      "function setFrozenTokens(address investor, uint256 amount) returns (bool)",
       "function getFrozenTokens(address investor) view returns (uint256)",
-      "function forcedTransfer(address from, address to, uint256 amount, string reason) returns (bool)",
+      "function forcedTransfer(address from, address to, uint256 amount) returns (bool)",
+      "function forcedTransferWithReason(address from, address to, uint256 amount, string reason) returns (bool)",
       "function markMatured()",
+      "function supportsInterface(bytes4 interfaceId) view returns (bool)",
     ];
+
+    const ERC7943_FUNGIBLE_INTERFACE_ID = "0x3edbb4c4";
 
     const ASSET_STATUS_LABELS = ["NotCreated", "Created", "Active", "Matured", "Cancelled"];
 
@@ -417,11 +426,21 @@
       if (!amount) throw new Error("Missing amount");
 
       const token = await getContract(true);
-      const tx = await token.forcedTransfer(from, to, amount, reason);
+      const tx = await token.forcedTransferWithReason(from, to, amount, reason);
       setStatus(`forcedTransfer sent: ${tx.hash}`);
       await tx.wait();
       setStatus("forcedTransfer confirmed");
       await refreshInfo();
+    }
+
+    async function checkErc7943Support() {
+      const token = await getContract(false);
+      const supported = await token.supportsInterface(ERC7943_FUNGIBLE_INTERFACE_ID);
+      setStatus(
+        supported
+          ? `supportsInterface(${ERC7943_FUNGIBLE_INTERFACE_ID}) = true -> conforme a ERC-7943 (fungible)`
+          : `supportsInterface(${ERC7943_FUNGIBLE_INTERFACE_ID}) = false -> NO conforme`
+      );
     }
 
     async function markMatured() {
@@ -446,6 +465,7 @@
     bind("btnConnect", connectWallet);
     bind("btnSwitch", switchToHardhatNetwork);
     bind("btnLoadDeploy", loadLatestDeploy);
+    bind("btnCheckErc7943", checkErc7943Support);
     bind("btnRefresh", refreshInfo);
 
     bind("btnCreateAsset", createAsset);
