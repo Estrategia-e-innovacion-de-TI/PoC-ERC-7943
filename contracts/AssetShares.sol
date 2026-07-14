@@ -2,17 +2,29 @@
 pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 
 /**
  * @title AssetShares
  * @notice RWA share token implementing the ERC-7943 (uRWA) fungible interface:
  *         https://eips.ethereum.org/EIPS/eip-7943
+ *
+ *         Access control is split into three roles instead of a single owner,
+ *         so the issuer, the compliance function and enforcement can be held
+ *         by different addresses (formal separation of duties):
+ *           - ISSUER_ROLE:      asset lifecycle (create/activate/issue/mature)
+ *           - COMPLIANCE_ROLE:  investor allow/block list (KYC/AML)
+ *           - ENFORCEMENT_ROLE: freeze and forced transfer
+ *         DEFAULT_ADMIN_ROLE (AccessControl's built-in admin role) can grant
+ *         and revoke all of the above.
  */
-contract AssetShares is ERC20, Ownable, ERC165 {
+contract AssetShares is ERC20, AccessControl {
     // ERC-7943 fungible interfaceId, per the EIP.
     bytes4 private constant _INTERFACE_ID_ERC7943_FUNGIBLE = 0x3edbb4c4;
+
+    bytes32 public constant ISSUER_ROLE = keccak256("ISSUER_ROLE");
+    bytes32 public constant COMPLIANCE_ROLE = keccak256("COMPLIANCE_ROLE");
+    bytes32 public constant ENFORCEMENT_ROLE = keccak256("ENFORCEMENT_ROLE");
 
     enum AssetStatus {
         NotCreated,
@@ -50,10 +62,15 @@ contract AssetShares is ERC20, Ownable, ERC165 {
     error ERC7943CannotTransfer(address from, address to, uint256 amount);
     error ERC7943InsufficientUnfrozenBalance(address account, uint256 amount, uint256 unfrozen);
 
-    constructor(
-        string memory tokenName,
-        string memory tokenSymbol
-    ) ERC20(tokenName, tokenSymbol) Ownable(msg.sender) {}
+    constructor(string memory tokenName, string memory tokenSymbol) ERC20(tokenName, tokenSymbol) {
+        // Deployer starts holding every role; DEFAULT_ADMIN_ROLE lets it
+        // delegate ISSUER/COMPLIANCE/ENFORCEMENT to separate addresses later
+        // via grantRole/revokeRole (inherited from AccessControl).
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(ISSUER_ROLE, msg.sender);
+        _grantRole(COMPLIANCE_ROLE, msg.sender);
+        _grantRole(ENFORCEMENT_ROLE, msg.sender);
+    }
 
     function decimals() public pure override returns (uint8) {
         return 0;
@@ -64,7 +81,7 @@ contract AssetShares is ERC20, Ownable, ERC165 {
         uint256 _totalShares,
         uint256 _maturityDate,
         string memory _documentHash
-    ) external onlyOwner {
+    ) external onlyRole(ISSUER_ROLE) {
         require(assetStatus == AssetStatus.NotCreated, "Asset already created");
         require(_totalShares > 0, "Total shares must be greater than zero");
         require(_maturityDate > block.timestamp, "Maturity date must be future");
@@ -79,7 +96,7 @@ contract AssetShares is ERC20, Ownable, ERC165 {
         emit AssetCreated(name, _totalShares, _maturityDate, _documentHash);
     }
 
-    function activateAsset() external onlyOwner {
+    function activateAsset() external onlyRole(ISSUER_ROLE) {
         require(assetStatus == AssetStatus.Created, "Asset must be created first");
 
         assetStatus = AssetStatus.Active;
@@ -87,7 +104,7 @@ contract AssetShares is ERC20, Ownable, ERC165 {
         emit AssetActivated();
     }
 
-    function approveInvestor(address investor) external onlyOwner {
+    function approveInvestor(address investor) external onlyRole(COMPLIANCE_ROLE) {
         require(investor != address(0), "Invalid investor");
 
         approvedInvestor[investor] = true;
@@ -96,7 +113,7 @@ contract AssetShares is ERC20, Ownable, ERC165 {
         emit InvestorApproved(investor);
     }
 
-    function blockInvestor(address investor) external onlyOwner {
+    function blockInvestor(address investor) external onlyRole(COMPLIANCE_ROLE) {
         require(investor != address(0), "Invalid investor");
 
         blockedInvestor[investor] = true;
@@ -142,7 +159,7 @@ contract AssetShares is ERC20, Ownable, ERC165 {
         return interfaceId == _INTERFACE_ID_ERC7943_FUNGIBLE || super.supportsInterface(interfaceId);
     }
 
-    function issueShares(address to, uint256 amount) external onlyOwner {
+    function issueShares(address to, uint256 amount) external onlyRole(ISSUER_ROLE) {
         require(assetStatus == AssetStatus.Active, "Asset is not active");
         require(amount > 0, "Amount must be greater than zero");
         require(issuedShares + amount <= totalShares, "Exceeds total shares");
@@ -159,7 +176,7 @@ contract AssetShares is ERC20, Ownable, ERC165 {
         return true;
     }
 
-    function setFrozenTokens(address investor, uint256 amount) external onlyOwner returns (bool) {
+    function setFrozenTokens(address investor, uint256 amount) external onlyRole(ENFORCEMENT_ROLE) returns (bool) {
         require(investor != address(0), "Invalid investor");
 
         frozenTokens[investor] = amount;
@@ -173,7 +190,7 @@ contract AssetShares is ERC20, Ownable, ERC165 {
         return frozenTokens[investor];
     }
 
-    function forcedTransfer(address from, address to, uint256 amount) external onlyOwner returns (bool) {
+    function forcedTransfer(address from, address to, uint256 amount) external onlyRole(ENFORCEMENT_ROLE) returns (bool) {
         return _executeForcedTransfer(from, to, amount);
     }
 
@@ -182,7 +199,7 @@ contract AssetShares is ERC20, Ownable, ERC165 {
         address to,
         uint256 amount,
         string calldata reason
-    ) external onlyOwner returns (bool) {
+    ) external onlyRole(ENFORCEMENT_ROLE) returns (bool) {
         bool ok = _executeForcedTransfer(from, to, amount);
         emit ForcedTransferReason(from, to, amount, reason);
         return ok;
@@ -209,7 +226,7 @@ contract AssetShares is ERC20, Ownable, ERC165 {
         return true;
     }
 
-    function markMatured() external onlyOwner {
+    function markMatured() external onlyRole(ISSUER_ROLE) {
         require(assetStatus == AssetStatus.Active, "Asset must be active");
         require(block.timestamp >= maturityDate, "Maturity date has not arrived");
 

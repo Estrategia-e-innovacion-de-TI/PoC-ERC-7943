@@ -44,6 +44,25 @@
 
   <hr />
 
+  <h2>Roles (separacion de responsabilidades)</h2>
+  <p>
+    Rol: <select id="roleSelect">
+      <option value="ISSUER_ROLE">ISSUER_ROLE</option>
+      <option value="COMPLIANCE_ROLE">COMPLIANCE_ROLE</option>
+      <option value="ENFORCEMENT_ROLE">ENFORCEMENT_ROLE</option>
+      <option value="DEFAULT_ADMIN_ROLE">DEFAULT_ADMIN_ROLE</option>
+    </select>
+    Cuenta: <input id="roleAccount" size="50" placeholder="0x..." />
+  </p>
+  <p>
+    <button id="btnGrantRole">grantRole</button>
+    <button id="btnRevokeRole">revokeRole</button>
+    <button id="btnCheckRole">hasRole?</button>
+  </p>
+  <pre id="roleOut">-</pre>
+
+  <hr />
+
   <h2>Escenario 1: Tokenizar el activo</h2>
   <p>
     Nombre del activo: <input id="createName" placeholder="Bono Demo" /><br />
@@ -119,7 +138,6 @@
       "function decimals() view returns (uint8)",
       "function totalSupply() view returns (uint256)",
       "function balanceOf(address) view returns (uint256)",
-      "function owner() view returns (address)",
       "function assetName() view returns (string)",
       "function totalShares() view returns (uint256)",
       "function issuedShares() view returns (uint256)",
@@ -141,6 +159,13 @@
       "function forcedTransferWithReason(address from, address to, uint256 amount, string reason) returns (bool)",
       "function markMatured()",
       "function supportsInterface(bytes4 interfaceId) view returns (bool)",
+      "function DEFAULT_ADMIN_ROLE() view returns (bytes32)",
+      "function ISSUER_ROLE() view returns (bytes32)",
+      "function COMPLIANCE_ROLE() view returns (bytes32)",
+      "function ENFORCEMENT_ROLE() view returns (bytes32)",
+      "function hasRole(bytes32 role, address account) view returns (bool)",
+      "function grantRole(bytes32 role, address account)",
+      "function revokeRole(bytes32 role, address account)",
     ];
 
     const ERC7943_FUNGIBLE_INTERFACE_ID = "0x3edbb4c4";
@@ -176,6 +201,10 @@
       forcedTo: document.getElementById("forcedTo"),
       forcedAmount: document.getElementById("forcedAmount"),
       forcedReason: document.getElementById("forcedReason"),
+
+      roleSelect: document.getElementById("roleSelect"),
+      roleAccount: document.getElementById("roleAccount"),
+      roleOut: document.getElementById("roleOut"),
     };
 
     let provider;
@@ -280,7 +309,6 @@
         maturityDate,
         documentHash,
         assetStatus,
-        owner,
       ] = await Promise.all([
         token.name(),
         token.symbol(),
@@ -290,12 +318,13 @@
         token.maturityDate(),
         token.documentHash(),
         token.assetStatus(),
-        token.owner(),
       ]);
 
       let balance = "Connect wallet first";
+      let myRoles = "Connect wallet first";
       if (currentAddress && ethers.isAddress(currentAddress)) {
         balance = (await token.balanceOf(currentAddress)).toString();
+        myRoles = (await rolesOf(token, currentAddress)).join(", ") || "(ninguno)";
       }
 
       el.out.textContent = [
@@ -307,11 +336,61 @@
         `maturityDate: ${formatMaturity(maturityDate)}`,
         `documentHash: ${documentHash}`,
         `assetStatus: ${ASSET_STATUS_LABELS[Number(assetStatus)]}`,
-        `owner: ${owner}`,
         `myBalance: ${balance}`,
+        `myRoles: ${myRoles}`,
       ].join("\n");
 
       setStatus("Info refreshed");
+    }
+
+    const ROLE_NAMES = ["ISSUER_ROLE", "COMPLIANCE_ROLE", "ENFORCEMENT_ROLE", "DEFAULT_ADMIN_ROLE"];
+
+    async function rolesOf(token, address) {
+      const held = [];
+      for (const roleName of ROLE_NAMES) {
+        const roleId = await token[roleName]();
+        if (await token.hasRole(roleId, address)) held.push(roleName);
+      }
+      return held;
+    }
+
+    async function grantRole() {
+      const roleName = el.roleSelect.value;
+      const account = el.roleAccount.value.trim();
+      if (!ethers.isAddress(account)) throw new Error("Invalid account address");
+
+      const token = await getContract(true);
+      const roleId = await token[roleName]();
+      const tx = await token.grantRole(roleId, account);
+      setStatus(`grantRole(${roleName}) sent: ${tx.hash}`);
+      await tx.wait();
+      setStatus(`grantRole(${roleName}) confirmed`);
+      el.roleOut.textContent = `${account} ahora tiene ${roleName}`;
+    }
+
+    async function revokeRole() {
+      const roleName = el.roleSelect.value;
+      const account = el.roleAccount.value.trim();
+      if (!ethers.isAddress(account)) throw new Error("Invalid account address");
+
+      const token = await getContract(true);
+      const roleId = await token[roleName]();
+      const tx = await token.revokeRole(roleId, account);
+      setStatus(`revokeRole(${roleName}) sent: ${tx.hash}`);
+      await tx.wait();
+      setStatus(`revokeRole(${roleName}) confirmed`);
+      el.roleOut.textContent = `${account} ya NO tiene ${roleName}`;
+    }
+
+    async function checkRole() {
+      const roleName = el.roleSelect.value;
+      const account = el.roleAccount.value.trim();
+      if (!ethers.isAddress(account)) throw new Error("Invalid account address");
+
+      const token = await getContract(false);
+      const roleId = await token[roleName]();
+      const has = await token.hasRole(roleId, account);
+      el.roleOut.textContent = `hasRole(${roleName}, ${account}) = ${has}`;
     }
 
     async function createAsset() {
@@ -467,6 +546,10 @@
     bind("btnLoadDeploy", loadLatestDeploy);
     bind("btnCheckErc7943", checkErc7943Support);
     bind("btnRefresh", refreshInfo);
+
+    bind("btnGrantRole", grantRole);
+    bind("btnRevokeRole", revokeRole);
+    bind("btnCheckRole", checkRole);
 
     bind("btnCreateAsset", createAsset);
     bind("btnActivateAsset", activateAsset);

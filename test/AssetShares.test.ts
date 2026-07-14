@@ -6,13 +6,14 @@ describe("AssetShares", function () {
   let owner: any;
   let a: any;
   let b: any;
+  let complianceOfficer: any;
   let token: any;
 
   const DOCUMENT_HASH = "ipfs://document-hash";
   const ERC7943_FUNGIBLE_INTERFACE_ID = "0x3edbb4c4";
 
   beforeEach(async function () {
-    [owner, a, b] = await ethers.getSigners();
+    [owner, a, b, complianceOfficer] = await ethers.getSigners();
 
     const AssetShares = await ethers.getContractFactory("AssetShares");
     token = await AssetShares.deploy("Asset Shares Token", "ASH");
@@ -23,6 +24,41 @@ describe("AssetShares", function () {
     const latest = await time.latest();
     return latest + daysAhead * 24 * 60 * 60;
   }
+
+  describe("Separacion de responsabilidades (roles)", function () {
+    it("el deployer arranca con los 3 roles operativos + el rol admin", async function () {
+      expect(await token.hasRole(await token.DEFAULT_ADMIN_ROLE(), owner.address)).to.equal(true);
+      expect(await token.hasRole(await token.ISSUER_ROLE(), owner.address)).to.equal(true);
+      expect(await token.hasRole(await token.COMPLIANCE_ROLE(), owner.address)).to.equal(true);
+      expect(await token.hasRole(await token.ENFORCEMENT_ROLE(), owner.address)).to.equal(true);
+    });
+
+    it("delegar COMPLIANCE_ROLE a otra cuenta le permite aprobar investors, pero no emitir shares", async function () {
+      const maturityDate = await futureMaturity();
+      await token.createAsset("Bono Demo", 1000, maturityDate, DOCUMENT_HASH);
+      await token.activateAsset();
+
+      await token.grantRole(await token.COMPLIANCE_ROLE(), complianceOfficer.address);
+
+      // La cuenta delegada SI puede aprobar (tiene COMPLIANCE_ROLE).
+      await token.connect(complianceOfficer).approveInvestor(a.address);
+      expect(await token.approvedInvestor(a.address)).to.equal(true);
+
+      // Pero NO puede emitir shares (eso requiere ISSUER_ROLE, que no tiene).
+      await expect(token.connect(complianceOfficer).issueShares(a.address, 10))
+        .to.be.revertedWithCustomError(token, "AccessControlUnauthorizedAccount")
+        .withArgs(complianceOfficer.address, await token.ISSUER_ROLE());
+    });
+
+    it("revocar un rol quita el acceso inmediatamente", async function () {
+      await token.grantRole(await token.COMPLIANCE_ROLE(), complianceOfficer.address);
+      await token.revokeRole(await token.COMPLIANCE_ROLE(), complianceOfficer.address);
+
+      await expect(token.connect(complianceOfficer).approveInvestor(a.address))
+        .to.be.revertedWithCustomError(token, "AccessControlUnauthorizedAccount")
+        .withArgs(complianceOfficer.address, await token.COMPLIANCE_ROLE());
+    });
+  });
 
   describe("Conformidad ERC-7943", function () {
     it("supportsInterface reporta el interfaceId fungible del EIP", async function () {
@@ -155,7 +191,7 @@ describe("AssetShares", function () {
       expect(await token.balanceOf(b.address)).to.equal(50);
     });
 
-    it("solo el owner puede ejecutar forcedTransfer", async function () {
+    it("solo una cuenta con ENFORCEMENT_ROLE puede ejecutar forcedTransfer", async function () {
       const maturityDate = await futureMaturity();
       await token.createAsset("Bono Demo", 1000, maturityDate, DOCUMENT_HASH);
       await token.activateAsset();
@@ -164,9 +200,9 @@ describe("AssetShares", function () {
       await token.approveInvestor(b.address);
       await token.issueShares(a.address, 100);
 
-      await expect(
-        token.connect(a).forcedTransfer(a.address, b.address, 50)
-      ).to.be.revertedWithCustomError(token, "OwnableUnauthorizedAccount");
+      await expect(token.connect(a).forcedTransfer(a.address, b.address, 50))
+        .to.be.revertedWithCustomError(token, "AccessControlUnauthorizedAccount")
+        .withArgs(a.address, await token.ENFORCEMENT_ROLE());
     });
   });
 
