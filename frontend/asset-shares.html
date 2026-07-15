@@ -4,131 +4,501 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AssetShares Demo (ERC-7943 PoC)</title>
+  <style>
+    :root {
+      --bg: #f4f5f7;
+      --surface: #ffffff;
+      --border: #e2e4e9;
+      --text: #1c1f26;
+      --muted: #6b7280;
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --warning: #b45309;
+      --warning-bg: #fff7ed;
+      --warning-border: #fed7aa;
+      --danger: #b91c1c;
+      --danger-bg: #fef2f2;
+      --danger-border: #fecaca;
+      --ok: #15803d;
+      --code-bg: #0f172a;
+      --code-text: #e2e8f0;
+      --radius: 10px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1115;
+        --surface: #171a21;
+        --border: #2a2e37;
+        --text: #e5e7eb;
+        --muted: #9ca3af;
+        --primary: #3b82f6;
+        --primary-dark: #60a5fa;
+        --warning: #fbbf24;
+        --warning-bg: #2a2011;
+        --warning-border: #4a3415;
+        --danger: #f87171;
+        --danger-bg: #2a1414;
+        --danger-border: #4a1f1f;
+        --ok: #4ade80;
+        --code-bg: #0b0e14;
+        --code-text: #d1d5db;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 0 0 48px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.4;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+    }
+
+    header h1 {
+      margin: 0 0 2px;
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+
+    header .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    main {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 20px 20px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+    }
+
+    .card h2 {
+      margin: 0 0 4px;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card .desc {
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 22px;
+      height: 22px;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: var(--primary);
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+
+    .badge.warning { background: var(--warning); color: #1c1f26; }
+    .badge.danger { background: var(--danger); color: #fff; }
+
+    .setup-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .setup-row:last-child { border-bottom: none; }
+
+    .setup-row .step-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.88rem;
+    }
+
+    .field {
+      margin-bottom: 12px;
+    }
+
+    .field:last-child { margin-bottom: 0; }
+
+    .field label {
+      display: block;
+      font-size: 0.76rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .row .field { flex: 1; min-width: 160px; }
+
+    input, select {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 0.88rem;
+      font-family: inherit;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    input[readonly] { color: var(--muted); }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: filter 0.1s ease;
+    }
+
+    button:hover { filter: brightness(0.96); }
+    button:active { filter: brightness(0.9); }
+
+    button.primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    button.warning {
+      background: var(--warning-bg);
+      border-color: var(--warning-border);
+      color: var(--warning);
+    }
+
+    button.danger {
+      background: var(--danger-bg);
+      border-color: var(--danger-border);
+      color: var(--danger);
+    }
+
+    pre {
+      margin: 0;
+      background: var(--code-bg);
+      color: var(--code-text);
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .status-bar {
+      position: sticky;
+      bottom: 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 10px 20px;
+      max-width: 880px;
+      margin: 24px auto 0;
+      border-radius: var(--radius) var(--radius) 0 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.82rem;
+    }
+
+    .status-bar .label {
+      color: var(--muted);
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .status-bar pre {
+      background: transparent;
+      color: var(--text);
+      padding: 0;
+      flex: 1;
+    }
+
+    hr.sep {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 4px 0 14px;
+    }
+  </style>
 </head>
 <body>
-  <h1>AssetShares (PoC ERC-7943 / uRWA)</h1>
+  <header>
+    <h1>AssetShares</h1>
+    <p class="subtitle">PoC ERC-7943 / uRWA &mdash; token de participaciones sobre un activo tokenizado</p>
+  </header>
 
-  <p>
-    1) Conecta MetaMask
-    <button id="btnConnect">Connect</button>
-  </p>
+  <main>
+    <section class="card">
+      <h2>Configuracion inicial</h2>
+      <p class="desc">Conecta MetaMask, cambia de red y carga el contrato desplegado.</p>
 
-  <p>
-    2) Cambia a red Hardhat 31337
-    <button id="btnSwitch">Switch network</button>
-  </p>
+      <div class="setup-row">
+        <span class="step-label"><span class="badge">1</span> Conecta MetaMask</span>
+        <button id="btnConnect" class="primary">Connect</button>
+      </div>
+      <div class="setup-row">
+        <span class="step-label"><span class="badge">2</span> Cambia a red Hardhat 31337</span>
+        <button id="btnSwitch">Switch network</button>
+      </div>
+      <div class="setup-row">
+        <span class="step-label"><span class="badge">3</span> Carga ultimo deploy</span>
+        <button id="btnLoadDeploy">Load deploy</button>
+      </div>
+      <div class="setup-row">
+        <span class="step-label"><span class="badge">4</span> Verifica conformidad ERC-7943 (ERC-165)</span>
+        <button id="btnCheckErc7943">supportsInterface(0x3edbb4c4)</button>
+      </div>
 
-  <p>
-    3) Carga ultimo deploy
-    <button id="btnLoadDeploy">Load deploy</button>
-  </p>
+      <div class="row" style="margin-top: 14px;">
+        <div class="field">
+          <label for="wallet">Wallet</label>
+          <input id="wallet" readonly placeholder="0x..." />
+        </div>
+        <div class="field">
+          <label for="contract">Contract</label>
+          <input id="contract" placeholder="0x..." />
+        </div>
+      </div>
+    </section>
 
-  <p>
-    4) Verifica conformidad ERC-7943 (ERC-165)
-    <button id="btnCheckErc7943">supportsInterface(0x3edbb4c4)</button>
-  </p>
+    <section class="card">
+      <h2>Estado del activo</h2>
+      <p class="desc">Datos on-chain leidos directamente del contrato.</p>
+      <div class="actions">
+        <button id="btnRefresh" class="primary">Refresh info</button>
+      </div>
+      <div style="margin-top: 12px;">
+        <pre id="out">No data yet.</pre>
+      </div>
+    </section>
 
-  <p>
-    Wallet: <input id="wallet" size="50" readonly />
-  </p>
+    <section class="card">
+      <h2>Roles <span style="font-weight: 400; color: var(--muted); font-size: 0.8rem;">(separacion de responsabilidades)</span></h2>
+      <p class="desc">ISSUER_ROLE, COMPLIANCE_ROLE y ENFORCEMENT_ROLE pueden vivir en cuentas distintas.</p>
+      <div class="row">
+        <div class="field">
+          <label for="roleSelect">Rol</label>
+          <select id="roleSelect">
+            <option value="ISSUER_ROLE">ISSUER_ROLE</option>
+            <option value="COMPLIANCE_ROLE">COMPLIANCE_ROLE</option>
+            <option value="ENFORCEMENT_ROLE">ENFORCEMENT_ROLE</option>
+            <option value="DEFAULT_ADMIN_ROLE">DEFAULT_ADMIN_ROLE</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="roleAccount">Cuenta</label>
+          <input id="roleAccount" placeholder="0x..." />
+        </div>
+      </div>
+      <div class="actions">
+        <button id="btnGrantRole">grantRole</button>
+        <button id="btnRevokeRole">revokeRole</button>
+        <button id="btnCheckRole">hasRole?</button>
+      </div>
+      <div style="margin-top: 12px;">
+        <pre id="roleOut">-</pre>
+      </div>
+    </section>
 
-  <p>
-    Contract: <input id="contract" size="50" placeholder="0x..." />
-  </p>
+    <section class="card">
+      <h2><span class="badge">1</span> Tokenizar el activo</h2>
+      <p class="desc">Crea el activo, activalo y emite las shares a un inversionista ya aprobado.</p>
 
-  <hr />
+      <div class="field">
+        <label for="createName">Nombre del activo</label>
+        <input id="createName" placeholder="Bono Demo" />
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="createTotalShares">Total shares</label>
+          <input id="createTotalShares" placeholder="1000" />
+        </div>
+        <div class="field">
+          <label for="createMaturity">Fecha de vencimiento</label>
+          <input id="createMaturity" type="datetime-local" />
+        </div>
+      </div>
+      <div class="field">
+        <label for="createDocHash">Document hash</label>
+        <input id="createDocHash" placeholder="ipfs://..." />
+      </div>
+      <div class="actions">
+        <button id="btnCreateAsset" class="primary">1a. createAsset</button>
+        <button id="btnActivateAsset" class="primary">1b. activateAsset</button>
+      </div>
 
-  <h2>Estado del activo</h2>
-  <p><button id="btnRefresh">Refresh info</button></p>
-  <pre id="out">No data yet.</pre>
+      <hr class="sep" />
 
-  <hr />
+      <div class="row">
+        <div class="field">
+          <label for="issueTo">Para</label>
+          <input id="issueTo" placeholder="0x..." />
+        </div>
+        <div class="field">
+          <label for="issueAmount">Cantidad</label>
+          <input id="issueAmount" placeholder="100" />
+        </div>
+      </div>
+      <div class="actions">
+        <button id="btnIssueShares" class="primary">1c. issueShares</button>
+      </div>
+    </section>
 
-  <h2>Roles (separacion de responsabilidades)</h2>
-  <p>
-    Rol: <select id="roleSelect">
-      <option value="ISSUER_ROLE">ISSUER_ROLE</option>
-      <option value="COMPLIANCE_ROLE">COMPLIANCE_ROLE</option>
-      <option value="ENFORCEMENT_ROLE">ENFORCEMENT_ROLE</option>
-      <option value="DEFAULT_ADMIN_ROLE">DEFAULT_ADMIN_ROLE</option>
-    </select>
-    Cuenta: <input id="roleAccount" size="50" placeholder="0x..." />
-  </p>
-  <p>
-    <button id="btnGrantRole">grantRole</button>
-    <button id="btnRevokeRole">revokeRole</button>
-    <button id="btnCheckRole">hasRole?</button>
-  </p>
-  <pre id="roleOut">-</pre>
+    <section class="card">
+      <h2><span class="badge">2</span> Comercializacion entre inversionistas aprobados</h2>
+      <p class="desc">Aprueba un inversionista (KYC) y transfiere shares desde la wallet conectada.</p>
 
-  <hr />
+      <div class="field">
+        <label for="approveInvestor">Investor</label>
+        <input id="approveInvestor" placeholder="0x..." />
+      </div>
+      <div class="actions">
+        <button id="btnApproveInvestor" class="primary">2a. approveInvestor</button>
+      </div>
 
-  <h2>Escenario 1: Tokenizar el activo</h2>
-  <p>
-    Nombre del activo: <input id="createName" placeholder="Bono Demo" /><br />
-    Total shares: <input id="createTotalShares" placeholder="1000" /><br />
-    Fecha de vencimiento: <input id="createMaturity" type="datetime-local" /><br />
-    Document hash: <input id="createDocHash" size="50" placeholder="ipfs://..." />
-  </p>
-  <p><button id="btnCreateAsset">1a. createAsset</button></p>
+      <hr class="sep" />
 
-  <p><button id="btnActivateAsset">1b. activateAsset</button></p>
+      <div class="row">
+        <div class="field">
+          <label for="transferTo">Para</label>
+          <input id="transferTo" placeholder="0x..." />
+        </div>
+        <div class="field">
+          <label for="transferAmount">Cantidad</label>
+          <input id="transferAmount" placeholder="20" />
+        </div>
+      </div>
+      <div class="actions">
+        <button id="btnTransferShares" class="primary">2b. transferShares (desde wallet conectada)</button>
+      </div>
+    </section>
 
-  <p>
-    Para: <input id="issueTo" size="50" placeholder="0x..." />
-    Cantidad: <input id="issueAmount" placeholder="100" />
-  </p>
-  <p><button id="btnIssueShares">1c. issueShares</button></p>
+    <section class="card">
+      <h2><span class="badge warning">3</span> Congelamiento de tokens</h2>
+      <p class="desc">ENFORCEMENT_ROLE puede congelar parte del saldo de un inversionista.</p>
 
-  <hr />
+      <div class="row">
+        <div class="field">
+          <label for="freezeInvestor">Investor</label>
+          <input id="freezeInvestor" placeholder="0x..." />
+        </div>
+        <div class="field">
+          <label for="freezeAmount">Cantidad congelada</label>
+          <input id="freezeAmount" placeholder="80" />
+        </div>
+      </div>
+      <div class="actions">
+        <button id="btnSetFrozen" class="warning">3a. setFrozenTokens</button>
+        <button id="btnGetFrozen">3b. getFrozenTokens</button>
+      </div>
+      <div style="margin-top: 12px;">
+        <pre id="frozenOut">-</pre>
+      </div>
+    </section>
 
-  <h2>Escenario 2: Comercializacion entre inversionistas aprobados</h2>
-  <p>
-    Investor: <input id="approveInvestor" size="50" placeholder="0x..." />
-  </p>
-  <p><button id="btnApproveInvestor">2a. approveInvestor</button></p>
+    <section class="card">
+      <h2><span class="badge danger">4</span> Transferencia forzada</h2>
+      <p class="desc">Bloquea un inversionista y ejecuta una transferencia forzada saltando las validaciones normales.</p>
 
-  <p>
-    Para: <input id="transferTo" size="50" placeholder="0x..." />
-    Cantidad: <input id="transferAmount" placeholder="20" />
-  </p>
-  <p><button id="btnTransferShares">2b. transferShares (desde wallet conectada)</button></p>
+      <div class="field">
+        <label for="blockInvestor">Investor a bloquear</label>
+        <input id="blockInvestor" placeholder="0x..." />
+      </div>
+      <div class="actions">
+        <button id="btnBlockInvestor" class="danger">4a. blockInvestor</button>
+      </div>
 
-  <hr />
+      <hr class="sep" />
 
-  <h2>Escenario 3: Congelamiento de tokens</h2>
-  <p>
-    Investor: <input id="freezeInvestor" size="50" placeholder="0x..." />
-    Cantidad congelada: <input id="freezeAmount" placeholder="80" />
-  </p>
-  <p><button id="btnSetFrozen">3a. setFrozenTokens</button></p>
-  <p><button id="btnGetFrozen">3b. getFrozenTokens</button></p>
-  <pre id="frozenOut">-</pre>
+      <div class="row">
+        <div class="field">
+          <label for="forcedFrom">Desde</label>
+          <input id="forcedFrom" placeholder="0x..." />
+        </div>
+        <div class="field">
+          <label for="forcedTo">Hacia</label>
+          <input id="forcedTo" placeholder="0x..." />
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="forcedAmount">Cantidad</label>
+          <input id="forcedAmount" placeholder="50" />
+        </div>
+        <div class="field">
+          <label for="forcedReason">Razon</label>
+          <input id="forcedReason" placeholder="orden judicial" />
+        </div>
+      </div>
+      <div class="actions">
+        <button id="btnForcedTransfer" class="danger">4b. forcedTransfer (solo ENFORCEMENT_ROLE)</button>
+      </div>
+    </section>
 
-  <hr />
+    <section class="card">
+      <h2><span class="badge">5</span> Vencimiento del activo</h2>
+      <p class="desc">Marca el activo como madurado una vez que paso la fecha de vencimiento.</p>
+      <div class="actions">
+        <button id="btnMarkMatured" class="primary">5. markMatured</button>
+      </div>
+    </section>
+  </main>
 
-  <h2>Escenario 4: Transferencia forzada</h2>
-  <p>
-    Investor a bloquear: <input id="blockInvestor" size="50" placeholder="0x..." />
-  </p>
-  <p><button id="btnBlockInvestor">4a. blockInvestor</button></p>
-
-  <p>
-    Desde: <input id="forcedFrom" size="50" placeholder="0x..." /><br />
-    Hacia: <input id="forcedTo" size="50" placeholder="0x..." /><br />
-    Cantidad: <input id="forcedAmount" placeholder="50" /><br />
-    Razon: <input id="forcedReason" size="50" placeholder="orden judicial" />
-  </p>
-  <p><button id="btnForcedTransfer">4b. forcedTransfer (solo owner)</button></p>
-
-  <hr />
-
-  <h2>Escenario 5: Vencimiento del activo</h2>
-  <p><button id="btnMarkMatured">5. markMatured</button></p>
-
-  <hr />
-  <p>Status:</p>
-  <pre id="status">Ready.</pre>
+  <div class="status-bar">
+    <span class="label">Status:</span>
+    <pre id="status">Ready.</pre>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
   <script>
