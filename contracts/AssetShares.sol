@@ -73,7 +73,9 @@ contract AssetShares is ERC20, AccessControl {
     }
 
     function decimals() public pure override returns (uint8) {
-        return 0;
+        
+
+        
     }
 
     function createAsset(
