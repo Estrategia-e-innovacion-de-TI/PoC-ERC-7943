@@ -11,6 +11,10 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  *         (compliance checks, transfer controls, enforcement actions).
  */
 contract SimpleToken is ERC20, Ownable {
+    /// @notice Deploys the token and mints the initial supply to the deployer, who also becomes the owner.
+    /// @param name          ERC-20 name of the token.
+    /// @param symbol        ERC-20 symbol of the token.
+    /// @param initialSupply Initial supply in whole token units (multiplied internally by `10 ** decimals()`).
     constructor(
         string memory name,
         string memory symbol,
