@@ -1,0 +1,1533 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Demo guiada — Ciclo de vida de un activo tokenizado (ERC-7943)</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --surface: #ffffff;
+    --surface-2: #f9fafb;
+    --border: #e2e4e9;
+    --text: #1c1f26;
+    --muted: #6b7280;
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --warning: #b45309;
+    --warning-bg: #fff7ed;
+    --warning-border: #fed7aa;
+    --danger: #b91c1c;
+    --danger-bg: #fef2f2;
+    --danger-border: #fecaca;
+    --ok: #15803d;
+    --ok-bg: #f0fdf4;
+    --ok-border: #bbf7d0;
+    --info-bg: #eff6ff;
+    --info-border: #bfdbfe;
+    --lesson-bg: #fefce8;
+    --lesson-border: #fde68a;
+    --code-bg: #0f172a;
+    --code-text: #e2e8f0;
+    --radius: 10px;
+
+    --c-banco: #d97706;
+    --c-propietario: #2563eb;
+    --c-inversionista: #ea580c;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115;
+      --surface: #171a21;
+      --surface-2: #1c2028;
+      --border: #2a2e37;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --primary: #3b82f6;
+      --primary-dark: #60a5fa;
+      --warning: #fbbf24;
+      --warning-bg: #2a2011;
+      --warning-border: #4a3415;
+      --danger: #f87171;
+      --danger-bg: #2a1414;
+      --danger-border: #4a1f1f;
+      --ok: #4ade80;
+      --ok-bg: #0f2417;
+      --ok-border: #16532f;
+      --info-bg: #10192b;
+      --info-border: #1e3a5f;
+      --lesson-bg: #2a2410;
+      --lesson-border: #4a3f14;
+      --code-bg: #0b0e14;
+      --code-text: #d1d5db;
+
+      --c-banco: #fbbf24;
+      --c-propietario: #60a5fa;
+      --c-inversionista: #fb923c;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.4;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  .hidden { display: none !important; }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    flex: 0 0 auto;
+  }
+
+  header h1 {
+    margin: 0 0 2px;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+
+  header .subtitle {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
+  /* ---------- Setup card ---------- */
+
+  .setup-card {
+    max-width: 640px;
+    margin: 32px auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 24px;
+    width: 100%;
+  }
+
+  .setup-card h2 { margin: 0 0 6px; font-size: 1.05rem; }
+  .setup-card .desc { color: var(--muted); font-size: 0.85rem; margin: 0 0 16px; }
+
+  .setup-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .setup-row:last-of-type { border-bottom: none; }
+
+  .step-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.88rem;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--primary);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+
+  .accounts-note {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-top: 14px;
+    font-size: 0.82rem;
+  }
+
+  .accounts-note ul { margin: 8px 0 0; padding-left: 0; list-style: none; }
+  .accounts-note li { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+  .accounts-note code { font-size: 0.78rem; background: transparent; }
+
+  .dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .dot.banco { background: var(--c-banco); }
+  .dot.propietario { background: var(--c-propietario); }
+  .dot.inversionista { background: var(--c-inversionista); }
+
+  .field { margin-top: 12px; }
+  .field label {
+    display: block;
+    font-size: 0.76rem;
+    color: var(--muted);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  input {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 0.85rem;
+    font-family: inherit;
+  }
+  input[readonly] { color: var(--muted); }
+
+  /* Indicador de wallet: NO es un campo de captura, es solo estado (por eso no es un <input>) */
+  .wallet-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    font-size: 0.85rem;
+  }
+  .wallet-status .wallet-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+    transition: background 0.2s ease;
+  }
+  .wallet-status.connected .wallet-dot { background: var(--ok); }
+  .wallet-status .wallet-text { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; }
+
+  .setup-error {
+    margin-top: 14px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--danger-bg);
+    border: 1px solid var(--danger-border);
+    color: var(--danger);
+    font-size: 0.84rem;
+    font-weight: 600;
+  }
+
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+
+  button {
+    appearance: none;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    padding: 9px 16px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 0.1s ease, transform 0.05s ease;
+  }
+  button:hover:not(:disabled) { filter: brightness(0.96); }
+  button:active:not(:disabled) { transform: scale(0.98); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  button.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+  button.danger { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); }
+
+  /* ---------- Turn gate banner ---------- */
+
+  .turn-gate {
+    margin-top: 14px;
+    border-radius: 8px;
+    padding: 12px 14px;
+    background: var(--warning-bg);
+    border: 1px solid var(--warning-border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    border-left: 4px solid var(--gate-color, var(--warning));
+    animation: gate-pulse 1.6s ease-in-out infinite;
+  }
+  .turn-gate .gate-msg { font-size: 0.86rem; font-weight: 600; flex: 1 1 260px; }
+  .turn-gate .gate-addr {
+    font-size: 0.78rem;
+    background: var(--code-bg);
+    color: var(--code-text);
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+
+  @keyframes gate-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(180, 83, 9, 0.25); }
+    50% { box-shadow: 0 0 0 6px rgba(180, 83, 9, 0); }
+  }
+
+  /* ---------- Ribbon (permanent summary) ---------- */
+
+  .ribbon {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 10px;
+    padding: 10px 20px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+
+  .ribbon-tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    min-width: 190px;
+    flex: 1 1 190px;
+    font-size: 0.76rem;
+  }
+
+  .ribbon-tile .tile-title {
+    font-weight: 700;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--muted);
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .ribbon-tile .tile-row { display: flex; justify-content: space-between; gap: 8px; }
+  .ribbon-tile .tile-row + .tile-row { margin-top: 2px; }
+  .ribbon-tile .tile-val { font-weight: 600; }
+
+  /* ---------- App layout ---------- */
+
+  #app {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .narrative-panel {
+    flex: 0 0 68vh;
+    max-height: 68vh;
+    overflow-y: auto;
+    padding: 18px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-width: 980px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .progress-wrap { display: flex; flex-direction: column; gap: 4px; }
+  .progress-bar {
+    height: 8px;
+    border-radius: 999px;
+    background: var(--border);
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+    transition: width 0.45s ease;
+  }
+  .progress-label { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+
+  .characters-row {
+    position: relative;
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .char-card {
+    flex: 1 1 220px;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: box-shadow 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
+    position: relative;
+    overflow: visible;
+  }
+
+  .char-card .avatar {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    background: var(--char-color);
+    color: #1c1f26;
+  }
+
+  .char-card .c-name { font-weight: 700; font-size: 0.95rem; }
+  .char-card .c-role { font-size: 0.74rem; color: var(--muted); }
+  .char-card .c-addr {
+    font-size: 0.7rem;
+    color: var(--muted);
+    background: var(--surface-2);
+    padding: 2px 6px;
+    border-radius: 6px;
+    display: inline-block;
+    width: fit-content;
+  }
+  .char-card .c-stats { font-size: 0.78rem; margin-top: 4px; display: flex; flex-direction: column; gap: 2px; }
+  .char-card .c-stats b { font-weight: 700; }
+  .char-card .c-estado {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    width: fit-content;
+    background: var(--surface-2);
+  }
+
+  .char-card.active {
+    border-color: var(--char-color);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--char-color) 35%, transparent);
+    animation: card-pulse 1.4s ease-in-out infinite;
+  }
+
+  @keyframes card-pulse {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-2px); }
+  }
+
+  .char-card.shake { animation: shake 0.5s ease; }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+  }
+
+  .overlay-badge {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    font-size: 1.6rem;
+    animation: overlay-pop 1.4s ease forwards;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+  }
+  @keyframes overlay-pop {
+    0% { transform: scale(0); opacity: 0; }
+    20% { transform: scale(1.2); opacity: 1; }
+    80% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(0.9); opacity: 0; }
+  }
+
+  .fly-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .fly-token {
+    position: absolute;
+    font-size: 1.8rem;
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+    transition: transform 0.85s cubic-bezier(.3,.6,.4,1), opacity 0.85s ease;
+    will-change: transform, opacity;
+  }
+
+  .coach-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 5px solid var(--primary);
+    border-radius: 10px;
+    padding: 16px 18px;
+    animation: fade-in 0.3s ease;
+  }
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .coach-box h3 { margin: 0 0 6px; font-size: 1rem; }
+  .coach-box p { margin: 0; font-size: 0.9rem; color: var(--text); }
+
+  .step-result {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+  }
+  .step-result.info { background: var(--info-bg); border-color: var(--info-border); color: var(--primary-dark); }
+  .step-result.success { background: var(--ok-bg); border-color: var(--ok-border); color: var(--ok); }
+  .step-result.rejected { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); }
+  .step-result.lesson { background: var(--lesson-bg); border-color: var(--lesson-border); color: var(--warning); }
+
+  .nav-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+
+  /* ---------- Log panel ---------- */
+
+  .log-panel {
+    flex: 1 1 auto;
+    min-height: 180px;
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid var(--border);
+    background: var(--surface-2);
+    padding: 10px 24px 16px;
+  }
+  .log-panel h2 { margin: 4px 0 8px; font-size: 0.88rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+
+  .log-scroll {
+    flex: 1;
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.74rem; }
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface-2);
+    text-align: left;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 5px 8px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tbody tr:last-child { animation: row-in 0.35s ease; }
+  @keyframes row-in {
+    from { background: color-mix(in srgb, var(--primary) 15%, transparent); }
+    to { background: transparent; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Demo guiada: Activo tokenizado ERC-7943</h1>
+    <p class="subtitle">Emisión &rarr; Comercialización &rarr; Cumplimiento regulatorio &rarr; Transferencia forzada</p>
+  </header>
+
+  <section id="setupCard" class="setup-card">
+    <h2>Configuración inicial</h2>
+    <p class="desc">Esta demo ejecuta transacciones reales contra un contrato <code>AssetShares</code> desplegado en un nodo Hardhat local (chainId 31337), firmadas por 3 cuentas distintas de MetaMask (Banco, Propietario, Inversionista). No se simula nada en el frontend.</p>
+
+    <div class="setup-row">
+      <span class="step-label"><span class="badge">1</span> Conecta MetaMask</span>
+      <button id="btnConnect" class="primary">Connect</button>
+    </div>
+    <div class="setup-row">
+      <span class="step-label"><span class="badge">2</span> Cambia a la red Hardhat (31337)</span>
+      <button id="btnSwitch">Switch network</button>
+    </div>
+
+    <div class="accounts-note">
+      <strong>Cuentas requeridas en MetaMask</strong> — importa las 3 cuentas de prueba estándar de Hardhat (mnemonic <code>test test test test test test test test test test test junk</code>, cuentas #0/#1/#2). Son públicas y solo deben usarse contra un nodo local.
+      <ul>
+        <li><span class="dot banco"></span> Banco &mdash; <code>0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266</code></li>
+        <li><span class="dot propietario"></span> Propietario &mdash; <code>0x70997970C51812dc3A010C7d01b50e0d17dc79C8</code></li>
+        <li><span class="dot inversionista"></span> Inversionista &mdash; <code>0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC</code></li>
+      </ul>
+    </div>
+
+    <div id="turnGateSetup" class="turn-gate hidden"></div>
+
+    <div class="field">
+      <label>Estado de conexión</label>
+      <div id="walletStatus" class="wallet-status">
+        <span class="wallet-dot" id="walletDot"></span>
+        <span class="wallet-text" id="walletText">MetaMask no conectado</span>
+      </div>
+    </div>
+
+    <div id="setupError" class="setup-error hidden"></div>
+
+    <div class="actions">
+      <button id="btnStartDemo" class="primary" disabled>Iniciar demo</button>
+    </div>
+  </section>
+
+  <div id="app" class="hidden">
+    <div class="ribbon" id="ribbon"></div>
+
+    <main class="narrative-panel">
+      <div class="progress-wrap">
+        <div class="progress-bar"><div id="progressFill" class="progress-fill"></div></div>
+        <div class="progress-label"><span id="etapaLabel"></span> &middot; <span id="stepLabel">Paso 1 de 15</span></div>
+      </div>
+
+      <div class="characters-row" id="charactersRow">
+        <div id="flyLayer" class="fly-layer"></div>
+      </div>
+
+      <div id="turnGateStep" class="turn-gate hidden"></div>
+
+      <div class="coach-box">
+        <h3 id="stepTitle"></h3>
+        <p id="stepNarrative"></p>
+        <div id="stepResult" class="step-result hidden"></div>
+      </div>
+
+      <div class="nav-actions">
+        <button id="btnPrev">&#9664; Anterior</button>
+        <button id="btnNext" class="primary">Siguiente &#9654;</button>
+        <button id="btnRestart" class="danger">Reiniciar</button>
+      </div>
+    </main>
+
+    <section class="log-panel">
+      <h2>Log del sistema</h2>
+      <div class="log-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha/Hora</th><th>Paso</th><th>Persona</th><th>Cuenta</th><th>Función</th>
+              <th>Balance</th><th>Congelado</th><th>Estado activo</th><th>Resultado</th><th>Mensaje</th>
+            </tr>
+          </thead>
+          <tbody id="logBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
+  <script>
+    // ---------------------------------------------------------------------
+    // Datos de personajes y constantes de red
+    // ---------------------------------------------------------------------
+
+    const CHAIN_ID_HEX = "0x7A69"; // 31337
+
+    const CHARACTERS = {
+      banco: {
+        key: "banco",
+        name: "Banco",
+        role: "Entidad emisora y administradora del activo tokenizado",
+        address: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        color: "#d97706",
+        emoji: "🏦",
+      },
+      propietario: {
+        key: "propietario",
+        name: "Propietario",
+        role: "Dueño original del activo que desea tokenizar",
+        address: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        color: "#2563eb",
+        emoji: "🧑‍💼",
+      },
+      inversionista: {
+        key: "inversionista",
+        name: "Inversionista",
+        role: "Persona interesada en adquirir una parte del activo",
+        address: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+        color: "#ea580c",
+        emoji: "💰",
+      },
+    };
+
+    const ASSET_STATUS_LABELS = ["No creado", "Creado", "Activo", "Vencido", "Cancelado"];
+
+    // ABI completo del contrato compilado (artifacts/contracts/AssetShares.sol/AssetShares.json)
+    const ABI = [{"inputs":[{"internalType":"string","name":"tokenName","type":"string"},{"internalType":"string","name":"tokenSymbol","type":"string"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[],"name":"AccessControlBadConfirmation","type":"error"},{"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"bytes32","name":"neededRole","type":"bytes32"}],"name":"AccessControlUnauthorizedAccount","type":"error"},{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"allowance","type":"uint256"},{"internalType":"uint256","name":"needed","type":"uint256"}],"name":"ERC20InsufficientAllowance","type":"error"},{"inputs":[{"internalType":"address","name":"sender","type":"address"},{"internalType":"uint256","name":"balance","type":"uint256"},{"internalType":"uint256","name":"needed","type":"uint256"}],"name":"ERC20InsufficientBalance","type":"error"},{"inputs":[{"internalType":"address","name":"approver","type":"address"}],"name":"ERC20InvalidApprover","type":"error"},{"inputs":[{"internalType":"address","name":"receiver","type":"address"}],"name":"ERC20InvalidReceiver","type":"error"},{"inputs":[{"internalType":"address","name":"sender","type":"address"}],"name":"ERC20InvalidSender","type":"error"},{"inputs":[{"internalType":"address","name":"spender","type":"address"}],"name":"ERC20InvalidSpender","type":"error"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"ERC7943CannotReceive","type":"error"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"ERC7943CannotSend","type":"error"},{"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"ERC7943CannotTransfer","type":"error"},{"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"unfrozen","type":"uint256"}],"name":"ERC7943InsufficientUnfrozenBalance","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"owner","type":"address"},{"indexed":true,"internalType":"address","name":"spender","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Approval","type":"event"},{"anonymous":false,"inputs":[],"name":"AssetActivated","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"string","name":"name","type":"string"},{"indexed":false,"internalType":"uint256","name":"totalShares","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"maturityDate","type":"uint256"},{"indexed":false,"internalType":"string","name":"documentHash","type":"string"}],"name":"AssetCreated","type":"event"},{"anonymous":false,"inputs":[],"name":"AssetMatured","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"ForcedTransfer","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"},{"indexed":false,"internalType":"string","name":"reason","type":"string"}],"name":"ForcedTransferReason","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"account","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"Frozen","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"investor","type":"address"}],"name":"InvestorApproved","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"investor","type":"address"}],"name":"InvestorBlocked","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"role","type":"bytes32"},{"indexed":true,"internalType":"bytes32","name":"previousAdminRole","type":"bytes32"},{"indexed":true,"internalType":"bytes32","name":"newAdminRole","type":"bytes32"}],"name":"RoleAdminChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"role","type":"bytes32"},{"indexed":true,"internalType":"address","name":"account","type":"address"},{"indexed":true,"internalType":"address","name":"sender","type":"address"}],"name":"RoleGranted","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"bytes32","name":"role","type":"bytes32"},{"indexed":true,"internalType":"address","name":"account","type":"address"},{"indexed":true,"internalType":"address","name":"sender","type":"address"}],"name":"RoleRevoked","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"SharesIssued","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Transfer","type":"event"},{"inputs":[],"name":"COMPLIANCE_ROLE","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"DEFAULT_ADMIN_ROLE","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"ENFORCEMENT_ROLE","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"ISSUER_ROLE","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"activateAsset","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"address","name":"spender","type":"address"}],"name":"allowance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"value","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"investor","type":"address"}],"name":"approveInvestor","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"approvedInvestor","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"assetName","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"assetStatus","outputs":[{"internalType":"enum AssetShares.AssetStatus","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"investor","type":"address"}],"name":"blockInvestor","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"blockedInvestor","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"to","type":"address"}],"name":"canReceive","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"from","type":"address"}],"name":"canSend","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"canTransfer","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"string","name":"name","type":"string"},{"internalType":"uint256","name":"_totalShares","type":"uint256"},{"internalType":"uint256","name":"_maturityDate","type":"uint256"},{"internalType":"string","name":"_documentHash","type":"string"}],"name":"createAsset","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"pure","type":"function"},{"inputs":[],"name":"documentHash","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"forcedTransfer","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"string","name":"reason","type":"string"}],"name":"forcedTransferWithReason","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"frozenTokens","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"investor","type":"address"}],"name":"getFrozenTokens","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"role","type":"bytes32"}],"name":"getRoleAdmin","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"role","type":"bytes32"},{"internalType":"address","name":"account","type":"address"}],"name":"grantRole","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"bytes32","name":"role","type":"bytes32"},{"internalType":"address","name":"account","type":"address"}],"name":"hasRole","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"issueShares","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"issuedShares","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"markMatured","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"maturityDate","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"name","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"bytes32","name":"role","type":"bytes32"},{"internalType":"address","name":"callerConfirmation","type":"address"}],"name":"renounceRole","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"bytes32","name":"role","type":"bytes32"},{"internalType":"address","name":"account","type":"address"}],"name":"revokeRole","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"investor","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"setFrozenTokens","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"bytes4","name":"interfaceId","type":"bytes4"}],"name":"supportsInterface","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"symbol","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"totalShares","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"totalSupply","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"value","type":"uint256"}],"name":"transfer","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"value","type":"uint256"}],"name":"transferFrom","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transferShares","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"}];
+
+    // Bytecode de creación del contrato compilado (mismo artifact). Solo se usa para
+    // desplegar una instancia fresca de AssetShares al iniciar/reiniciar la demo.
+    const CONTRACT_BYTECODE = "0x608060405234801561001057600080fd5b5060405161243f38038061243f83398101604081905261002f9161024c565b8181600361003d838261033e565b50600461004a828261033e565b5061005a915060009050336100e3565b506100857f114e74f6ea3bd819998f78687bfcb11b140da08e9b7d222fa9c1f1ba1f2aa122336100e3565b506100b07f442a94f1a1fac79af32856af2a64f63648cfa2ef3b98610a5bb7cbec4cee6985336100e3565b506100db7f2d6c15ab38f79552ca1424b46e30c23a1ee917321e80d0262611744717735482336100e3565b5050506103fc565b60008281526005602090815260408083206001600160a01b038516845290915281205460ff166101895760008381526005602090815260408083206001600160a01b03861684529091529020805460ff191660011790556101413390565b6001600160a01b0316826001600160a01b0316847f2f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d60405160405180910390a450600161018d565b5060005b92915050565b634e487b7160e01b600052604160045260246000fd5b600082601f8301126101ba57600080fd5b81516001600160401b038111156101d3576101d3610193565b604051601f8201601f19908116603f011681016001600160401b038111828210171561020157610201610193565b60405281815283820160200185101561021957600080fd5b60005b828110156102385760208186018101518383018201520161021c565b506000918101602001919091529392505050565b6000806040838503121561025f57600080fd5b82516001600160401b0381111561027557600080fd5b610281858286016101a9565b602085015190935090506001600160401b0381111561029f57600080fd5b6102ab858286016101a9565b9150509250929050565b600181811c908216806102c957607f821691505b6020821081036102e957634e487b7160e01b600052602260045260246000fd5b50919050565b601f82111561033957806000526020600020601f840160051c810160208510156103165750805b601f840160051c820191505b818110156103365760008155600101610322565b50505b505050565b81516001600160401b0381111561035757610357610193565b61036b8161036584546102b5565b846102ef565b6020601f82116001811461039f57600083156103875750848201515b600019600385901b1c1916600184901b178455610336565b600084815260208120601f198516915b828110156103cf57878501518255602094850194600190920191016103af565b50848210156103ed5786840151600019600387901b60f8161c191681555b50505050600190811b01905550565b6120348061040b6000396000f3fe608060405234801561001057600080fd5b506004361061025e5760003560e01c806382aefa2411610146578063c9230c5d116100c3578063e46638e611610087578063e46638e61461056c578063ebe45cba1461057f578063ed088cd714610592578063efc7a8ee146105a7578063f9110287146105ba578063fecd6b9b146105cd57600080fd5b8063c9230c5d14610507578063c94b37591461050f578063d547741f14610517578063d59624b41461052a578063dd62ed3e1461053357600080fd5b80639fc1d0e71161010a5780639fc1d0e7146104a6578063a217fddf146104b9578063a9059cbb146104c1578063bf947852146104d4578063bfd85808146104e757600080fd5b806382aefa24146104505780638fcb4e5b1461046557806390d370ba1461047857806391d148541461048b57806395d89b411461049e57600080fd5b80632b183eed116101df5780633a98ef39116101a35780633a98ef39146103d85780636d8690a9146103e157806370a08231146103e957806372aa58a614610412578063797bec77146104355780637de141291461043d57600080fd5b80632b183eed1461037b5780632bc06a921461038e5780632f2ff15d146103a1578063313ce567146103b657806336568abe146103c557600080fd5b806318160ddd1161022657806318160ddd146103115780631b416e79146103195780632208830d1461033c57806323b872dd14610345578063248a9ca31461035857600080fd5b806301ffc9a714610263578063062d3bd71461028b57806306fdde03146102c0578063095ea7b3146102d5578063158b1a57146102e8575b600080fd5b610276610271366004611a13565b6105e7565b60405190151581526020015b60405180910390f35b6102b27f442a94f1a1fac79af32856af2a64f63648cfa2ef3b98610a5bb7cbec4cee698581565b604051908152602001610282565b6102c8610612565b6040516102829190611a83565b6102766102e3366004611ab2565b6106a4565b6102b26102f6366004611adc565b6001600160a01b03166000908152600e602052604090205490565b6002546102b2565b610276610327366004611adc565b600c6020526000908152604090205460ff1681565b6102b260085481565b610276610353366004611af7565b6106bc565b6102b2610366366004611b34565b60009081526005602052604090206001015490565b610276610389366004611b4d565b6106e2565b61027661039c366004611adc565b610765565b6103b46103af366004611bea565b6107cf565b005b60405160008152602001610282565b6103b46103d3366004611bea565b6107fa565b6102b260075481565b6103b4610832565b6102b26103f7366004611adc565b6001600160a01b031660009081526020819052604090205490565b610276610420366004611adc565b600d6020526000908152604090205460ff1681565b6102c8610937565b6103b461044b366004611adc565b6109c5565b6102b2600080516020611fdf83398151915281565b610276610473366004611ab2565b610a77565b610276610486366004611adc565b610a83565b610276610499366004611bea565b610ae4565b6102c8610b0f565b6102766104b4366004611af7565b610b1e565b6102b2600081565b6102766104cf366004611ab2565b610b4c565b6103b46104e2366004611adc565b610b5a565b6102b26104f5366004611adc565b600e6020526000908152604090205481565b6102c8610bf7565b6103b4610c04565b6103b4610525366004611bea565b610cbb565b6102b260095481565b6102b2610541366004611c16565b6001600160a01b03918216600090815260016020908152604080832093909416825291909152205490565b61027661057a366004611af7565b610ce0565b61027661058d366004611ab2565b610d9e565b6102b2600080516020611fbf83398151915281565b6103b46105b5366004611ab2565b610e3d565b6103b46105c8366004611ce5565b611016565b600b546105da9060ff1681565b6040516102829190611d77565b60006001600160e01b03198216630fb6ed3160e21b148061060c575061060c82611201565b92915050565b60606003805461062190611d9f565b80601f016020809104026020016040519081016040528092919081815260200182805461064d90611d9f565b801561069a5780601f1061066f5761010080835404028352916020019161069a565b820191906000526020600020905b81548152906001019060200180831161067d57829003601f168201915b5050505050905090565b6000336106b2818585611236565b5060019392505050565b6000336106ca858285611243565b6106d58585856112bc565b60019150505b9392505050565b6000600080516020611fbf8339815191526106fc8161131b565b6000610709888888611328565b9050866001600160a01b0316886001600160a01b03167f9027d3eba2180b25c867997e303431a71f4f62a491692dd27825fb847a4812ab88888860405161075293929190611dd9565b60405180910390a3979650505050505050565b60006002600b5460ff16600481111561078057610780611d61565b1461078d57506000919050565b600954421061079e57506000919050565b6001600160a01b0382166000908152600d602052604090205460ff16156107c757506000919050565b506001919050565b6000828152600560205260409020600101546107ea8161131b565b6107f48383611540565b50505050565b6001600160a01b03811633146108235760405163334bd91960e11b815260040160405180910390fd5b61082d82826115d4565b505050565b600080516020611fdf83398151915261084a8161131b565b6002600b5460ff16600481111561086357610863611d61565b146108ac5760405162461bcd60e51b81526020600482015260146024820152734173736574206d7573742062652061637469766560601b60448201526064015b60405180910390fd5b6009544210156108fe5760405162461bcd60e51b815260206004820152601d60248201527f4d61747572697479206461746520686173206e6f74206172726976656400000060448201526064016108a3565b600b805460ff191660031790556040517f97228303aba3586743d5f36b7a07094ab7647b472a8d583b53ec44080574c2e890600090a150565b600a805461094490611d9f565b80601f016020809104026020016040519081016040528092919081815260200182805461097090611d9f565b80156109bd5780601f10610992576101008083540402835291602001916109bd565b820191906000526020600020905b8154815290600101906020018083116109a057829003601f168201915b505050505081565b7f442a94f1a1fac79af32856af2a64f63648cfa2ef3b98610a5bb7cbec4cee69856109ef8161131b565b6001600160a01b038216610a155760405162461bcd60e51b81526004016108a390611e0f565b6001600160a01b0382166000818152600c60209081526040808320805460ff19908116600117909155600d9092528083208054909216909155517fc7853123482ca3ec317449fd45a5e5ed5efc279029522e1d09c4845cfe9f8bd29190a25050565b60006106b28383610b4c565b60006002600b5460ff166004811115610a9e57610a9e611d61565b14610aab57506000919050565b6009544210610abc57506000919050565b6001600160a01b0382166000908152600c602052604090205460ff1661079e57506000919050565b60009182526005602090815260408084206001600160a01b0393909316845291905290205460ff1690565b60606004805461062190611d9f565b6000600080516020611fbf833981519152610b388161131b565b610b43858585611328565b95945050505050565b6000336106b28185856112bc565b7f442a94f1a1fac79af32856af2a64f63648cfa2ef3b98610a5bb7cbec4cee6985610b848161131b565b6001600160a01b038216610baa5760405162461bcd60e51b81526004016108a390611e0f565b6001600160a01b0382166000818152600d6020526040808220805460ff19166001179055517fb920420e259eed5b8279b2b7af8b5d65e685ef51736f3da4f571536f41165c119190a25050565b6006805461094490611d9f565b600080516020611fdf833981519152610c1c8161131b565b6001600b5460ff166004811115610c3557610c35611d61565b14610c825760405162461bcd60e51b815260206004820152601b60248201527f4173736574206d7573742062652063726561746564206669727374000000000060448201526064016108a3565b600b805460ff191660021790556040517ffb81031f2111543e7dc5a38c9fc539e507a4da28643707f953c4f94e85d8c71290600090a150565b600082815260056020526040902060010154610cd68161131b565b6107f483836115d4565b600081600003610cf2575060006106db565b610cfb84610765565b610d07575060006106db565b610d1083610a83565b610d1c575060006106db565b6001600160a01b03841660009081526020819052604090205482811015610d475760009150506106db565b6001600160a01b0385166000908152600e60205260408120549082821015610d7857610d738284611e4f565b610d7b565b60005b905084811015610d9157600093505050506106db565b5060019695505050505050565b6000600080516020611fbf833981519152610db88161131b565b6001600160a01b038416610dde5760405162461bcd60e51b81526004016108a390611e0f565b6001600160a01b0384166000818152600e602052604090819020859055517f68e0d8c112165d0949ce87205b719ed7d98c7401866c34a159f7c67c6f5620e790610e2b9086815260200190565b60405180910390a25060019392505050565b600080516020611fdf833981519152610e558161131b565b6002600b5460ff166004811115610e6e57610e6e611d61565b14610eb15760405162461bcd60e51b81526020600482015260136024820152724173736574206973206e6f742061637469766560681b60448201526064016108a3565b60008211610f015760405162461bcd60e51b815260206004820181905260248201527f416d6f756e74206d7573742062652067726561746572207468616e207a65726f60448201526064016108a3565b60075482600854610f129190611e62565b1115610f575760405162461bcd60e51b81526020600482015260146024820152734578636565647320746f74616c2073686172657360601b60448201526064016108a3565b610f6083610a83565b610fac5760405162461bcd60e51b815260206004820152601e60248201527f52656365697665722063616e6e6f74207265636569766520736861726573000060448201526064016108a3565b8160086000828254610fbe9190611e62565b90915550610fce90508383611641565b826001600160a01b03167f3abf6d97fde3541bb582f72fa6fb75093b8bb699577fbc722ac25de9f6fbc4ed8360405161100991815260200190565b60405180910390a2505050565b600080516020611fdf83398151915261102e8161131b565b6000600b5460ff16600481111561104757611047611d61565b1461108c5760405162461bcd60e51b8152602060048201526015602482015274105cdcd95d08185b1c9958591e4818dc99585d1959605a1b60448201526064016108a3565b600084116110eb5760405162461bcd60e51b815260206004820152602660248201527f546f74616c20736861726573206d7573742062652067726561746572207468616044820152656e207a65726f60d01b60648201526084016108a3565b42831161113a5760405162461bcd60e51b815260206004820152601c60248201527f4d617475726974792064617465206d757374206265206675747572650000000060448201526064016108a3565b600082511161118b5760405162461bcd60e51b815260206004820152601960248201527f446f63756d656e7420686173682069732072657175697265640000000000000060448201526064016108a3565b60066111978682611ec3565b5060078490556009839055600a6111ae8382611ec3565b50600b805460ff191660011790556040517fe544058d99beafad60380870770598ec751535604958febff947683dcc05759b906111f2908790879087908790611f82565b60405180910390a15050505050565b60006001600160e01b03198216637965db0b60e01b148061060c57506301ffc9a760e01b6001600160e01b031983161461060c565b61082d838383600161167b565b6001600160a01b038381166000908152600160209081526040808320938616835292905220546000198110156107f457818110156112ad57604051637dc7a0d960e11b81526001600160a01b038416600482015260248101829052604481018390526064016108a3565b6107f48484848403600061167b565b6001600160a01b0383166112e657604051634b637e8f60e11b8152600060048201526024016108a3565b6001600160a01b0382166113105760405163ec442f0560e01b8152600060048201526024016108a3565b61082d838383611750565b61132581336118b0565b50565b60008082116113795760405162461bcd60e51b815260206004820181905260248201527f416d6f756e74206d7573742062652067726561746572207468616e207a65726f60448201526064016108a3565b81611399856001600160a01b031660009081526020819052604090205490565b10156113de5760405162461bcd60e51b8152602060048201526014602482015273496e73756666696369656e742062616c616e636560601b60448201526064016108a3565b6113e783610a83565b6114335760405162461bcd60e51b815260206004820152601e60248201527f52656365697665722063616e6e6f74207265636569766520736861726573000060448201526064016108a3565b6001600160a01b038416600090815260208190526040812054611457908490611e4f565b6001600160a01b0386166000908152600e60205260409020549091508110156114d0576001600160a01b0385166000818152600e602052604090819020839055517f68e0d8c112165d0949ce87205b719ed7d98c7401866c34a159f7c67c6f5620e7906114c79084815260200190565b60405180910390a25b600f805460ff191660011790556114e8858585611750565b600f805460ff191690556040518381526001600160a01b0385811691908716907f7b3ce50c216d2ccf9919c6b9f1bfb33f0350a33010f188750b4af38e004481389060200160405180910390a3506001949350505050565b600061154c8383610ae4565b6115cc5760008381526005602090815260408083206001600160a01b03861684529091529020805460ff191660011790556115843390565b6001600160a01b0316826001600160a01b0316847f2f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d60405160405180910390a450600161060c565b50600061060c565b60006115e08383610ae4565b156115cc5760008381526005602090815260408083206001600160a01b0386168085529252808320805460ff1916905551339286917ff6391f5c32d9c69d2a47ea670b442974b53935d1edc7fd64eb21e047a839171b9190a450600161060c565b6001600160a01b03821661166b5760405163ec442f0560e01b8152600060048201526024016108a3565b61167760008383611750565b5050565b6001600160a01b0384166116a55760405163e602df0560e01b8152600060048201526024016108a3565b6001600160a01b0383166116cf57604051634a1406b160e11b8152600060048201526024016108a3565b6001600160a01b03808516600090815260016020908152604080832093871683529290522082905580156107f457826001600160a01b0316846001600160a01b03167f8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b9258460405161174291815260200190565b60405180910390a350505050565b6001600160a01b0383161580159061177057506001600160a01b03821615155b801561177f5750600f5460ff16155b156118a55761178d83610765565b6117b5576040516322dd74f160e11b81526001600160a01b03841660048201526024016108a3565b6117be82610a83565b6117e65760405163705c1eed60e01b81526001600160a01b03831660048201526024016108a3565b6001600160a01b03831660009081526020818152604080832054600e9092528220549091828210156118215761181c8284611e4f565b611824565b60005b90508084111561185f5760405162384e7160e01b81526001600160a01b038716600482015260248101859052604481018290526064016108a3565b61186a868686610ce0565b6118a15760405163116ed25f60e11b81526001600160a01b03808816600483015286166024820152604481018590526064016108a3565b5050505b61082d8383836118e9565b6118ba8282610ae4565b6116775760405163e2517d3f60e01b81526001600160a01b0382166004820152602481018390526044016108a3565b6001600160a01b0383166119145780600260008282546119099190611e62565b909155506119869050565b6001600160a01b038316600090815260208190526040902054818110156119675760405163391434e360e21b81526001600160a01b038516600482015260248101829052604481018390526064016108a3565b6001600160a01b03841660009081526020819052604090209082900390555b6001600160a01b0382166119a2576002805482900390556119c1565b6001600160a01b03821660009081526020819052604090208054820190555b816001600160a01b0316836001600160a01b03167fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef83604051611a0691815260200190565b60405180910390a3505050565b600060208284031215611a2557600080fd5b81356001600160e01b0319811681146106db57600080fd5b6000815180845260005b81811015611a6357602081850181015186830182015201611a47565b506000602082860101526020601f19601f83011685010191505092915050565b6020815260006106db6020830184611a3d565b80356001600160a01b0381168114611aad57600080fd5b919050565b60008060408385031215611ac557600080fd5b611ace83611a96565b946020939093013593505050565b600060208284031215611aee57600080fd5b6106db82611a96565b600080600060608486031215611b0c57600080fd5b611b1584611a96565b9250611b2360208501611a96565b929592945050506040919091013590565b600060208284031215611b4657600080fd5b5035919050565b600080600080600060808688031215611b6557600080fd5b611b6e86611a96565b9450611b7c60208701611a96565b935060408601359250606086013567ffffffffffffffff811115611b9f57600080fd5b8601601f81018813611bb057600080fd5b803567ffffffffffffffff811115611bc757600080fd5b886020828401011115611bd957600080fd5b959894975092955050506020019190565b60008060408385031215611bfd57600080fd5b82359150611c0d60208401611a96565b90509250929050565b60008060408385031215611c2957600080fd5b611c3283611a96565b9150611c0d60208401611a96565b634e487b7160e01b600052604160045260246000fd5b600082601f830112611c6757600080fd5b813567ffffffffffffffff811115611c8157611c81611c40565b604051601f8201601f19908116603f0116810167ffffffffffffffff81118282101715611cb057611cb0611c40565b604052818152838201602001851015611cc857600080fd5b816020850160208301376000918101602001919091529392505050565b60008060008060808587031215611cfb57600080fd5b843567ffffffffffffffff811115611d1257600080fd5b611d1e87828801611c56565b9450506020850135925060408501359150606085013567ffffffffffffffff811115611d4957600080fd5b611d5587828801611c56565b91505092959194509250565b634e487b7160e01b600052602160045260246000fd5b6020810160058310611d9957634e487b7160e01b600052602160045260246000fd5b91905290565b600181811c90821680611db357607f821691505b602082108103611dd357634e487b7160e01b600052602260045260246000fd5b50919050565b83815260406020820152816040820152818360608301376000818301606090810191909152601f909201601f1916010192915050565b60208082526010908201526f24b73b30b634b21034b73b32b9ba37b960811b604082015260600190565b634e487b7160e01b600052601160045260246000fd5b8181038181111561060c5761060c611e39565b8082018082111561060c5761060c611e39565b601f82111561082d57806000526020600020601f840160051c81016020851015611e9c5750805b601f840160051c820191505b81811015611ebc5760008155600101611ea8565b5050505050565b815167ffffffffffffffff811115611edd57611edd611c40565b611ef181611eeb8454611d9f565b84611e75565b6020601f821160018114611f255760008315611f0d5750848201515b600019600385901b1c1916600184901b178455611ebc565b600084815260208120601f198516915b82811015611f555787850151825560209485019460019092019101611f35565b5084821015611f735786840151600019600387901b60f8161c191681555b50505050600190811b01905550565b608081526000611f956080830187611a3d565b8560208401528460408401528281036060840152611fb38185611a3d565b97965050505050505056fe2d6c15ab38f79552ca1424b46e30c23a1ee917321e80d0262611744717735482114e74f6ea3bd819998f78687bfcb11b140da08e9b7d222fa9c1f1ba1f2aa122a2646970667358221220a4e7dd3dd72ae6cc0d98b7747ff879dac0aa44b47d0e0f4add523d27ded1448764736f6c634300081c0033";
+
+    // ---------------------------------------------------------------------
+    // Estado mutable
+    // ---------------------------------------------------------------------
+
+    let provider = null;
+    let contractAddress = null;
+    let maturityTs = null;
+    let executedCount = 0;   // pasos ya ejecutados (frontera)
+    let viewIndex = 0;       // paso actualmente mostrado
+    let pendingTurnRetry = null;
+    let latestState = null;
+    const stepResults = new Array(16).fill(null);
+
+    const el = {
+      walletStatus: document.getElementById("walletStatus"),
+      walletDot: document.getElementById("walletDot"),
+      walletText: document.getElementById("walletText"),
+      setupError: document.getElementById("setupError"),
+      btnConnect: document.getElementById("btnConnect"),
+      btnSwitch: document.getElementById("btnSwitch"),
+      btnStartDemo: document.getElementById("btnStartDemo"),
+      setupCard: document.getElementById("setupCard"),
+      app: document.getElementById("app"),
+      ribbon: document.getElementById("ribbon"),
+      charactersRow: document.getElementById("charactersRow"),
+      flyLayer: document.getElementById("flyLayer"),
+      progressFill: document.getElementById("progressFill"),
+      etapaLabel: document.getElementById("etapaLabel"),
+      stepLabel: document.getElementById("stepLabel"),
+      stepTitle: document.getElementById("stepTitle"),
+      stepNarrative: document.getElementById("stepNarrative"),
+      stepResult: document.getElementById("stepResult"),
+      btnPrev: document.getElementById("btnPrev"),
+      btnNext: document.getElementById("btnNext"),
+      btnRestart: document.getElementById("btnRestart"),
+      logBody: document.getElementById("logBody"),
+      logScroll: document.querySelector(".log-scroll"),
+      turnGateSetup: document.getElementById("turnGateSetup"),
+      turnGateStep: document.getElementById("turnGateStep"),
+    };
+
+    // ---------------------------------------------------------------------
+    // Utilidades
+    // ---------------------------------------------------------------------
+
+    function getEthereum() {
+      if (!window.ethereum) throw new Error("MetaMask no encontrado. Instala la extensión para continuar.");
+      return window.ethereum;
+    }
+
+    function shortAddr(addr) {
+      return addr.slice(0, 6) + "…" + addr.slice(-4);
+    }
+
+    function nowStr() {
+      return new Date().toLocaleTimeString();
+    }
+
+    function characterForAddress(addr) {
+      if (!addr) return null;
+      const lower = addr.toLowerCase();
+      return Object.values(CHARACTERS).find((c) => c.address.toLowerCase() === lower) || null;
+    }
+
+    function updateWalletDisplay(addr) {
+      el.btnStartDemo.disabled = !addr;
+      el.walletStatus.classList.toggle("connected", !!addr);
+      if (!addr) {
+        el.walletText.textContent = "MetaMask no conectado";
+        return;
+      }
+      const match = characterForAddress(addr);
+      el.walletText.textContent = match
+        ? `${shortAddr(addr)} — ${match.emoji} ${match.name}`
+        : `${shortAddr(addr)} — ⚠️ cuenta no reconocida (no es Banco/Propietario/Inversionista)`;
+    }
+
+    function showSetupError(message) {
+      el.setupError.textContent = message;
+      el.setupError.classList.remove("hidden");
+    }
+
+    function clearSetupError() {
+      el.setupError.classList.add("hidden");
+      el.setupError.textContent = "";
+    }
+
+    async function detectExistingConnection() {
+      if (!window.ethereum) return;
+      try {
+        const accounts = await window.ethereum.request({ method: "eth_accounts" });
+        if (accounts && accounts[0]) {
+          provider = new ethers.BrowserProvider(window.ethereum);
+          updateWalletDisplay(accounts[0]);
+        }
+      } catch (_) { /* silencioso: solo es una detección pasiva al cargar */ }
+    }
+
+    // ---------------------------------------------------------------------
+    // Conexión / red
+    // ---------------------------------------------------------------------
+
+    async function connectWallet() {
+      const eth = getEthereum();
+      provider = new ethers.BrowserProvider(eth);
+      const accounts = await eth.request({ method: "eth_requestAccounts" });
+      updateWalletDisplay(accounts[0]);
+    }
+
+    async function switchToHardhatNetwork() {
+      const eth = getEthereum();
+      try {
+        await eth.request({ method: "wallet_switchEthereumChain", params: [{ chainId: CHAIN_ID_HEX }] });
+      } catch (err) {
+        if (err && err.code === 4902) {
+          await eth.request({
+            method: "wallet_addEthereumChain",
+            params: [{
+              chainId: CHAIN_ID_HEX,
+              chainName: "Hardhat Local",
+              nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+              rpcUrls: ["http://127.0.0.1:8545"],
+            }],
+          });
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    if (window.ethereum && window.ethereum.on) {
+      window.ethereum.on("accountsChanged", (accounts) => {
+        updateWalletDisplay(accounts[0]);
+        if (pendingTurnRetry) {
+          const fn = pendingTurnRetry;
+          pendingTurnRetry = null;
+          fn();
+        }
+      });
+    }
+
+    // ---------------------------------------------------------------------
+    // Gate de turno
+    // ---------------------------------------------------------------------
+
+    function showGate(gateElId, expectedKey, opts) {
+      opts = opts || {};
+      const gateEl = document.getElementById(gateElId);
+      const char = CHARACTERS[expectedKey];
+      gateEl.classList.remove("hidden");
+      gateEl.style.setProperty("--gate-color", char.color);
+      gateEl.innerHTML = "";
+
+      const msg = document.createElement("div");
+      msg.className = "gate-msg";
+      msg.textContent = `🔄 Cambio de turno: conecta MetaMask con la cuenta de ${char.emoji} ${char.name} para continuar` +
+        (opts.actionLabel ? ` (${opts.actionLabel})` : "") + ".";
+
+      const addr = document.createElement("code");
+      addr.className = "gate-addr";
+      addr.textContent = char.address;
+
+      const copyBtn = document.createElement("button");
+      copyBtn.type = "button";
+      copyBtn.textContent = "Copiar dirección";
+      copyBtn.addEventListener("click", () => {
+        navigator.clipboard.writeText(char.address).catch(() => {});
+      });
+
+      gateEl.append(msg, addr, copyBtn);
+      pendingTurnRetry = opts.retry || null;
+    }
+
+    function hideGate(gateElId) {
+      const gateEl = document.getElementById(gateElId);
+      gateEl.classList.add("hidden");
+      gateEl.innerHTML = "";
+    }
+
+    async function ensureTurn(expectedKey, gateElId, retryFn, actionLabel) {
+      const expected = CHARACTERS[expectedKey];
+      let accounts = [];
+      try {
+        accounts = await getEthereum().request({ method: "eth_accounts" });
+      } catch (_) {
+        accounts = [];
+      }
+      const active = (accounts[0] || "").toLowerCase();
+      if (active === expected.address.toLowerCase()) {
+        hideGate(gateElId);
+        return true;
+      }
+      showGate(gateElId, expectedKey, { retry: retryFn, actionLabel });
+      return false;
+    }
+
+    // ---------------------------------------------------------------------
+    // Contrato
+    // ---------------------------------------------------------------------
+
+    function getReadContract() {
+      return new ethers.Contract(contractAddress, ABI, provider);
+    }
+
+    async function getWriteContract() {
+      const signer = await provider.getSigner();
+      return new ethers.Contract(contractAddress, ABI, signer);
+    }
+
+    async function readAssetInfo() {
+      const c = getReadContract();
+      const [name, symbol, assetName, totalShares, issuedShares, maturityDate, documentHash, assetStatus, totalSupply] =
+        await Promise.all([
+          c.name(), c.symbol(), c.assetName(), c.totalShares(), c.issuedShares(),
+          c.maturityDate(), c.documentHash(), c.assetStatus(), c.totalSupply(),
+        ]);
+      return {
+        name, symbol, assetName,
+        totalShares: totalShares.toString(),
+        issuedShares: issuedShares.toString(),
+        maturityDate: Number(maturityDate),
+        documentHash,
+        assetStatus: Number(assetStatus),
+        totalSupply: totalSupply.toString(),
+      };
+    }
+
+    async function readCharacterInfo(key) {
+      const addr = CHARACTERS[key].address;
+      const c = getReadContract();
+      const [balance, frozen, approved, blocked] = await Promise.all([
+        c.balanceOf(addr), c.frozenTokens(addr), c.approvedInvestor(addr), c.blockedInvestor(addr),
+      ]);
+      return { balance: balance.toString(), frozen: frozen.toString(), approved, blocked };
+    }
+
+    function describeRevert(err) {
+      if (err && (err.code === "ACTION_REJECTED" || err.code === 4001)) {
+        return "Transacción cancelada por el usuario en MetaMask.";
+      }
+      try {
+        const data = err?.data || err?.info?.error?.data || err?.error?.data || err?.revert?.data;
+        if (data) {
+          const iface = new ethers.Interface(ABI);
+          const parsed = iface.parseError(data);
+          if (parsed) return formatKnownError(parsed.name, parsed.args);
+        }
+      } catch (_) { /* no-op, fall through to generic message */ }
+      if (err && err.revert && err.revert.name) {
+        return formatKnownError(err.revert.name, err.revert.args);
+      }
+      return (err && (err.shortMessage || err.reason || err.message)) || String(err);
+    }
+
+    function formatKnownError(name, args) {
+      switch (name) {
+        case "ERC7943InsufficientUnfrozenBalance":
+          return `Rechazado: saldo disponible insuficiente. Disponible: ${args[2]}, intentado: ${args[1]} (el resto está congelado).`;
+        case "ERC7943CannotSend":
+          return `Rechazado: la cuenta ${args[0]} no puede enviar tokens en este momento (bloqueada o activo inactivo).`;
+        case "ERC7943CannotReceive":
+          return `Rechazado: la cuenta ${args[0]} no puede recibir tokens en este momento.`;
+        case "ERC7943CannotTransfer":
+          return `Rechazado: la transferencia de ${args[2]} tokens de ${args[0]} a ${args[1]} no es válida en este momento.`;
+        default:
+          return `Rechazado: ${name}`;
+      }
+    }
+
+    // ---------------------------------------------------------------------
+    // Log
+    // ---------------------------------------------------------------------
+
+    function appendLog(row) {
+      const tr = document.createElement("tr");
+      const cols = [
+        nowStr(),
+        row.paso ?? "",
+        row.persona ?? "",
+        row.cuenta ? shortAddr(row.cuenta) : "",
+        row.funcion ?? "",
+        row.balance ?? "",
+        row.congelado ?? "",
+        row.estadoActivo ?? "",
+        row.resultado ?? "",
+        row.mensaje ?? "",
+      ];
+      for (const val of cols) {
+        const td = document.createElement("td");
+        td.textContent = String(val);
+        tr.appendChild(td);
+      }
+      el.logBody.appendChild(tr);
+      el.logScroll.scrollTop = el.logScroll.scrollHeight;
+    }
+
+    // ---------------------------------------------------------------------
+    // Animaciones
+    // ---------------------------------------------------------------------
+
+    function cardEl(key) {
+      return document.getElementById("card-" + key);
+    }
+
+    function animateFly(fromKey, toKey, emoji) {
+      emoji = emoji || "🪙";
+      const fromCard = cardEl(fromKey);
+      const toCard = cardEl(toKey);
+      if (!fromCard || !toCard) return;
+      const layerRect = el.flyLayer.getBoundingClientRect();
+      const a = fromCard.getBoundingClientRect();
+      const b = toCard.getBoundingClientRect();
+
+      const token = document.createElement("div");
+      token.className = "fly-token";
+      token.textContent = emoji;
+      token.style.left = (a.left - layerRect.left + a.width / 2) + "px";
+      token.style.top = (a.top - layerRect.top + a.height / 2) + "px";
+      el.flyLayer.appendChild(token);
+
+      requestAnimationFrame(() => {
+        token.style.transform = `translate(${b.left - a.left}px, ${b.top - a.top}px) scale(0.5)`;
+        token.style.opacity = "0";
+      });
+      setTimeout(() => token.remove(), 900);
+    }
+
+    function pulseOverlay(key, emoji) {
+      const card = cardEl(key);
+      if (!card) return;
+      const badge = document.createElement("div");
+      badge.className = "overlay-badge";
+      badge.textContent = emoji;
+      card.appendChild(badge);
+      setTimeout(() => badge.remove(), 1400);
+    }
+
+    function shakeCard(key) {
+      const card = cardEl(key);
+      if (!card) return;
+      card.classList.add("shake");
+      setTimeout(() => card.classList.remove("shake"), 500);
+    }
+
+    // ---------------------------------------------------------------------
+    // Ejecución de llamadas al contrato
+    // ---------------------------------------------------------------------
+
+    async function execStep(actorKey, fn, args, opts) {
+      opts = opts || {};
+      const actor = CHARACTERS[actorKey];
+      const label = opts.label || `${fn}(${args.join(", ")})`;
+      try {
+        const contract = await getWriteContract();
+        const tx = await contract[fn](...args);
+        await tx.wait();
+        const info = await readCharacterInfo(actorKey);
+        const asset = await readAssetInfo();
+        appendLog({
+          paso: opts.paso, persona: actor.name, cuenta: actor.address, funcion: label,
+          balance: info.balance, congelado: info.frozen,
+          estadoActivo: ASSET_STATUS_LABELS[asset.assetStatus],
+          resultado: "✅", mensaje: opts.successMessage || "Transacción confirmada.",
+        });
+        return { ok: true, message: opts.successMessage || "Transacción confirmada." };
+      } catch (err) {
+        const desc = describeRevert(err);
+        let info = null;
+        let asset = null;
+        try { info = await readCharacterInfo(actorKey); } catch (_) { /* contrato puede no existir aún */ }
+        try { asset = await readAssetInfo(); } catch (_) { /* idem */ }
+        appendLog({
+          paso: opts.paso, persona: actor.name, cuenta: actor.address, funcion: label,
+          balance: info ? info.balance : "", congelado: info ? info.frozen : "",
+          estadoActivo: asset ? ASSET_STATUS_LABELS[asset.assetStatus] : "",
+          resultado: "❌", mensaje: desc,
+        });
+        return { ok: false, message: desc, unexpected: !opts.expectRejection };
+      }
+    }
+
+    function narrativeStep(paso, actorKey, message) {
+      return async () => {
+        const actor = actorKey ? CHARACTERS[actorKey] : null;
+        appendLog({
+          paso, persona: actor ? actor.name : "—", cuenta: actor ? actor.address : "",
+          funcion: "(narrativo — sin transacción)", resultado: "ℹ️", mensaje: message,
+        });
+        return { kind: "info", message };
+      };
+    }
+
+    // ---------------------------------------------------------------------
+    // Guion de los 15 pasos
+    // ---------------------------------------------------------------------
+
+    const STEPS = [
+      {
+        etapa: "Etapa 1 · Emisión del activo", actors: ["propietario", "banco"], signerKey: null,
+        title: "Solicitud de tokenización",
+        narrative: "El propietario solicita al banco la tokenización de su activo.",
+        execute: narrativeStep(1, "propietario", "Solicitud de tokenización registrada."),
+      },
+      {
+        etapa: "Etapa 1 · Emisión del activo", actors: ["banco", "propietario"], signerKey: "banco",
+        title: "Validación de identidad",
+        narrative: "El banco valida la identidad del propietario (KYC) y lo autoriza como participante habilitado.",
+        execute: async () => {
+          const r = await execStep("banco", "approveInvestor", [CHARACTERS.propietario.address],
+            { paso: 2, successMessage: "Propietario autorizado." });
+          return { kind: r.ok ? "success" : "rejected", message: r.message };
+        },
+      },
+      {
+        etapa: "Etapa 1 · Emisión del activo", actors: ["banco"], signerKey: "banco",
+        title: "Creación y activación del activo",
+        narrative: "El banco define los términos del activo (Bono Demo, 1000 shares, vencimiento a 1 año, documento asociado) y lo activa. Todavía no existen tokens emitidos.",
+        execute: async () => {
+          const r1 = await execStep("banco", "createAsset",
+            ["Bono Demo", 1000, maturityTs, "ipfs://demo-bono-doc-hash"],
+            { paso: 3, successMessage: "Activo creado: Bono Demo, 1000 shares." });
+          if (r1.unexpected) return { kind: "rejected", message: r1.message };
+          const r2 = await execStep("banco", "activateAsset", [], { paso: 3, successMessage: "Activo activado." });
+          return { kind: r2.ok ? "success" : "rejected", message: r2.message };
+        },
+      },
+      {
+        etapa: "Etapa 1 · Emisión del activo", actors: ["banco", "propietario"], signerKey: "banco",
+        title: "Emisión de shares",
+        narrative: "El banco emite 1000 tokens ASH y los entrega al propietario.",
+        execute: async () => {
+          const r = await execStep("banco", "issueShares", [CHARACTERS.propietario.address, 1000],
+            { paso: 4, successMessage: "1000 ASH emitidos al propietario." });
+          if (r.ok) animateFly("banco", "propietario", "✨");
+          return { kind: r.ok ? "success" : "rejected", message: r.message };
+        },
+      },
+      {
+        etapa: "Etapa 2 · Comercialización", actors: ["inversionista"], signerKey: null,
+        title: "Solicitud de compra",
+        narrative: "El inversionista solicita comprar el 30% del activo (300 de 1000 ASH).",
+        execute: narrativeStep(5, "inversionista", "Solicitud de compra registrada."),
+      },
+      {
+        etapa: "Etapa 2 · Comercialización", actors: ["banco", "inversionista"], signerKey: "banco",
+        title: "Validación del inversionista",
+        narrative: "El banco valida al inversionista (KYC) y lo aprueba.",
+        execute: async () => {
+          const r = await execStep("banco", "approveInvestor", [CHARACTERS.inversionista.address],
+            { paso: 6, successMessage: "Inversionista aprobado." });
+          return { kind: r.ok ? "success" : "rejected", message: r.message };
+        },
+      },
+      {
+        etapa: "Etapa 2 · Comercialización", actors: ["propietario", "inversionista"], signerKey: "propietario",
+        title: "Transferencia comercial",
+        narrative: "El propietario transfiere 300 ASH al inversionista.",
+        execute: async () => {
+          const r = await execStep("propietario", "transferShares", [CHARACTERS.inversionista.address, 300],
+            { paso: 7, successMessage: "300 ASH transferidos al inversionista." });
+          if (r.ok) animateFly("propietario", "inversionista");
+          return { kind: r.ok ? "success" : "rejected", message: r.message };
+        },
+      },
+      {
+        etapa: "Etapa 3 · Cumplimiento regulatorio", actors: ["banco", "inversionista"], signerKey: null,
+        title: "Decisión de congelamiento",
+        narrative: "El banco decide congelar 100 ASH del inversionista por motivos de cumplimiento regulatorio.",
+        execute: narrativeStep(8, "banco", "Decisión de congelamiento registrada."),
+      },
+      {
+        etapa: "Etapa 3 · Cumplimiento regulatorio", actors: ["banco", "inversionista"], signerKey: "banco",
+        title: "Congelamiento ejecutado",
+        narrative: "Se ejecuta el congelamiento: 100 de los 300 ASH del inversionista quedan congelados (disponible: 200).",
+        execute: async () => {
+          const r = await execStep("banco", "setFrozenTokens", [CHARACTERS.inversionista.address, 100],
+            { paso: 9, successMessage: "100 ASH congelados. Disponible: 200." });
+          if (r.ok) pulseOverlay("inversionista", "❄️");
+          return { kind: r.ok ? "success" : "rejected", message: r.message };
+        },
+      },
+      {
+        etapa: "Etapa 3 · Cumplimiento regulatorio", actors: ["inversionista", "propietario"], signerKey: "inversionista",
+        title: "Intento de transferencia total (rechazado)",
+        narrative: "El inversionista intenta transferir los 300 ASH completos al propietario.",
+        execute: async () => {
+          const r = await execStep("inversionista", "transferShares", [CHARACTERS.propietario.address, 300],
+            { paso: 10, expectRejection: true });
+          shakeCard("inversionista");
+          return { kind: "rejected", message: r.message || "Rechazada: saldo disponible insuficiente (100 ASH están congelados)." };
+        },
+      },
+      {
+        etapa: "Etapa 3 · Cumplimiento regulatorio", actors: ["inversionista", "propietario"], signerKey: "inversionista",
+        title: "Intento de transferencia parcial — ¡sí se ejecuta!",
+        narrative: "El inversionista intenta transferir únicamente 100 ASH, justo el monto que fue congelado.",
+        execute: async () => {
+          const r = await execStep("inversionista", "transferShares", [CHARACTERS.propietario.address, 100],
+            { paso: 11, successMessage: "100 ASH transferidos (el saldo disponible alcanzaba)." });
+          if (r.ok) animateFly("inversionista", "propietario");
+          return {
+            kind: "lesson",
+            message: r.ok
+              ? "Sorpresa: esta transferencia SÍ se ejecuta. El congelamiento en ERC-7943 es un monto absoluto restado del balance (un \"piso\"), no un bloqueo de unidades específicas. Como el disponible era 200, transferir 100 es perfectamente válido."
+              : r.message,
+          };
+        },
+      },
+      {
+        etapa: "Etapa 4 · Transferencia forzada", actors: ["banco"], signerKey: null,
+        title: "Orden judicial",
+        narrative: "Un juez ordena transferir 50 ASH desde el inversionista hacia el propietario. ⚖️",
+        execute: narrativeStep(12, "banco", "Orden judicial recibida: transferir 50 ASH del inversionista al propietario."),
+      },
+      {
+        etapa: "Etapa 4 · Transferencia forzada", actors: ["banco", "inversionista"], signerKey: "banco",
+        title: "Bloqueo de cuenta",
+        narrative: "El banco bloquea la cuenta del inversionista mientras se ejecuta la orden.",
+        execute: async () => {
+          const r = await execStep("banco", "blockInvestor", [CHARACTERS.inversionista.address],
+            { paso: 13, successMessage: "Cuenta del inversionista bloqueada." });
+          if (r.ok) pulseOverlay("inversionista", "🚫");
+          return { kind: r.ok ? "success" : "rejected", message: r.message };
+        },
+      },
+      {
+        etapa: "Etapa 4 · Transferencia forzada", actors: ["inversionista", "propietario"], signerKey: "inversionista",
+        title: "Intento de transferencia (cuenta bloqueada)",
+        narrative: "El inversionista intenta transferir 50 ASH por su cuenta.",
+        execute: async () => {
+          const r = await execStep("inversionista", "transferShares", [CHARACTERS.propietario.address, 50],
+            { paso: 14, expectRejection: true });
+          shakeCard("inversionista");
+          return { kind: "rejected", message: r.message || "Rechazada: la cuenta está bloqueada." };
+        },
+      },
+      {
+        etapa: "Etapa 4 · Transferencia forzada", actors: ["banco", "inversionista", "propietario"], signerKey: "banco",
+        title: "Transferencia forzada",
+        narrative: "El banco, usando sus privilegios administrativos (ENFORCEMENT_ROLE), ejecuta la transferencia forzada de 50 ASH desde el inversionista hacia el propietario.",
+        execute: async () => {
+          const r = await execStep("banco", "forcedTransferWithReason",
+            [CHARACTERS.inversionista.address, CHARACTERS.propietario.address, 50, "Orden judicial - recuperacion forzosa"],
+            { paso: 15, successMessage: "Transferencia forzada ejecutada." });
+          if (r.ok) animateFly("inversionista", "propietario", "⚖️");
+          return { kind: r.ok ? "success" : "rejected", message: r.message };
+        },
+      },
+    ];
+
+    // ---------------------------------------------------------------------
+    // Render: ribbon, tarjetas de personaje, paso actual
+    // ---------------------------------------------------------------------
+
+    function buildCharacterCards() {
+      el.charactersRow.innerHTML = "";
+      el.charactersRow.appendChild(el.flyLayer);
+      for (const key of Object.keys(CHARACTERS)) {
+        const c = CHARACTERS[key];
+        const card = document.createElement("div");
+        card.className = "char-card";
+        card.id = "card-" + key;
+        card.style.setProperty("--char-color", c.color);
+
+        const avatar = document.createElement("div");
+        avatar.className = "avatar";
+        avatar.textContent = c.emoji;
+
+        const name = document.createElement("div");
+        name.className = "c-name";
+        name.textContent = c.name;
+
+        const role = document.createElement("div");
+        role.className = "c-role";
+        role.textContent = c.role;
+
+        const addr = document.createElement("div");
+        addr.className = "c-addr";
+        addr.title = c.address;
+        addr.textContent = shortAddr(c.address);
+
+        const stats = document.createElement("div");
+        stats.className = "c-stats";
+        stats.innerHTML =
+          '<div>Balance: <b class="c-balance">–</b> ASH</div>' +
+          '<div>Congelado: <b class="c-frozen">–</b> ASH</div>';
+
+        const estado = document.createElement("div");
+        estado.className = "c-estado";
+        estado.textContent = "–";
+
+        card.append(avatar, name, role, addr, stats, estado);
+        el.charactersRow.appendChild(card);
+      }
+    }
+
+    function statusLabel(key, info) {
+      if (key === "banco") return "Administrador (Issuer · Compliance · Enforcement)";
+      if (info.blocked) return "Bloqueado";
+      if (info.approved) return "Aprobado";
+      return "Pendiente de aprobación";
+    }
+
+    function renderCharacterCards(state) {
+      for (const key of Object.keys(CHARACTERS)) {
+        const card = cardEl(key);
+        if (!card) continue;
+        const info = state[key];
+        card.querySelector(".c-balance").textContent = info.balance;
+        card.querySelector(".c-frozen").textContent = info.frozen;
+        card.querySelector(".c-estado").textContent = statusLabel(key, info);
+      }
+    }
+
+    function ribbonTile(title, rows) {
+      const tile = document.createElement("div");
+      tile.className = "ribbon-tile";
+      const t = document.createElement("div");
+      t.className = "tile-title";
+      t.textContent = title;
+      tile.appendChild(t);
+      for (const [label, value] of rows) {
+        const row = document.createElement("div");
+        row.className = "tile-row";
+        const l = document.createElement("span");
+        l.textContent = label;
+        const v = document.createElement("span");
+        v.className = "tile-val";
+        v.textContent = value;
+        row.append(l, v);
+        tile.appendChild(row);
+      }
+      return tile;
+    }
+
+    function renderRibbon(state) {
+      el.ribbon.innerHTML = "";
+      const maturity = state.asset.maturityDate
+        ? new Date(state.asset.maturityDate * 1000).toLocaleDateString()
+        : "—";
+      el.ribbon.appendChild(ribbonTile("📄 Activo", [
+        ["Token", `${state.asset.name} (${state.asset.symbol})`],
+        ["Activo", state.asset.assetName || "—"],
+        ["Total supply", state.asset.totalSupply],
+        ["Estado", ASSET_STATUS_LABELS[state.asset.assetStatus]],
+        ["Vencimiento", maturity],
+      ]));
+      for (const key of Object.keys(CHARACTERS)) {
+        const c = CHARACTERS[key];
+        const info = state[key];
+        el.ribbon.appendChild(ribbonTile(`${c.emoji} ${c.name}`, [
+          ["Balance", `${info.balance} ASH`],
+          ["Congelado", `${info.frozen} ASH`],
+          ["Estado", statusLabel(key, info)],
+        ]));
+      }
+    }
+
+    async function refreshRibbon() {
+      const asset = await readAssetInfo();
+      const banco = await readCharacterInfo("banco");
+      const propietario = await readCharacterInfo("propietario");
+      const inversionista = await readCharacterInfo("inversionista");
+      latestState = { asset, banco, propietario, inversionista };
+      renderRibbon(latestState);
+      renderCharacterCards(latestState);
+    }
+
+    function resultIcon(kind) {
+      return { info: "ℹ️", success: "✅", rejected: "❌", lesson: "🎓" }[kind] || "";
+    }
+
+    function renderStep(idx) {
+      const step = STEPS[idx - 1];
+      const result = stepResults[idx];
+
+      el.stepLabel.textContent = `Paso ${idx} de ${STEPS.length}`;
+      el.etapaLabel.textContent = step.etapa;
+      el.progressFill.style.width = `${(idx / STEPS.length) * 100}%`;
+      el.stepTitle.textContent = step.title;
+      el.stepNarrative.textContent = step.narrative;
+
+      for (const key of Object.keys(CHARACTERS)) {
+        const card = cardEl(key);
+        if (card) card.classList.toggle("active", step.actors.includes(key));
+      }
+
+      el.stepResult.className = "step-result";
+      if (result) {
+        el.stepResult.classList.add(result.kind);
+        el.stepResult.textContent = `${resultIcon(result.kind)} ${result.message}`;
+      } else {
+        el.stepResult.classList.add("hidden");
+        el.stepResult.textContent = "";
+      }
+
+      el.btnPrev.disabled = idx <= 1;
+      const demoDone = idx === STEPS.length && executedCount === STEPS.length;
+      el.btnNext.disabled = demoDone;
+      el.btnNext.textContent = demoDone ? "🎉 Demo completada" : "Siguiente ▶";
+    }
+
+    function setButtonsBusy(busy) {
+      el.btnNext.disabled = busy || (viewIndex === STEPS.length && executedCount === STEPS.length);
+      el.btnPrev.disabled = busy || viewIndex <= 1;
+      el.btnRestart.disabled = busy;
+    }
+
+    // ---------------------------------------------------------------------
+    // Navegación de pasos
+    // ---------------------------------------------------------------------
+
+    async function goNext() {
+      if (viewIndex < executedCount) {
+        viewIndex++;
+        renderStep(viewIndex);
+        return;
+      }
+
+      const nextIndex = executedCount + 1;
+      if (nextIndex > STEPS.length) return;
+
+      const step = STEPS[nextIndex - 1];
+      if (step.signerKey) {
+        const ok = await ensureTurn(step.signerKey, "turnGateStep", () => goNext(), step.title);
+        if (!ok) return;
+      } else {
+        hideGate("turnGateStep");
+      }
+
+      setButtonsBusy(true);
+      try {
+        const result = await step.execute();
+        stepResults[nextIndex] = result;
+        executedCount = nextIndex;
+        viewIndex = nextIndex;
+        await refreshRibbon();
+        renderStep(viewIndex);
+      } finally {
+        setButtonsBusy(false);
+      }
+    }
+
+    function goPrev() {
+      if (viewIndex > 1) {
+        viewIndex--;
+        hideGate("turnGateStep");
+        renderStep(viewIndex);
+      }
+    }
+
+    // ---------------------------------------------------------------------
+    // Iniciar / Reiniciar demo (deploy real de AssetShares)
+    // ---------------------------------------------------------------------
+
+    async function deployFreshContract() {
+      maturityTs = Math.floor(Date.now() / 1000) + 365 * 24 * 3600;
+      const signer = await provider.getSigner();
+      const factory = new ethers.ContractFactory(ABI, CONTRACT_BYTECODE, signer);
+      appendLog({
+        paso: "—", persona: CHARACTERS.banco.name, cuenta: CHARACTERS.banco.address,
+        funcion: 'deploy AssetShares("Asset Shares Token", "ASH")', resultado: "⏳", mensaje: "Desplegando contrato...",
+      });
+      const contract = await factory.deploy("Asset Shares Token", "ASH");
+      await contract.waitForDeployment();
+      contractAddress = await contract.getAddress();
+      appendLog({
+        paso: "—", persona: CHARACTERS.banco.name, cuenta: CHARACTERS.banco.address,
+        funcion: "deploy", resultado: "✅", mensaje: `Contrato AssetShares desplegado en ${contractAddress}.`,
+      });
+    }
+
+    async function startDemo() {
+      const ok = await ensureTurn("banco", "turnGateSetup", () => startDemo(), "desplegar el contrato");
+      if (!ok) return;
+
+      el.btnStartDemo.disabled = true;
+      try {
+        await deployFreshContract();
+        el.setupCard.classList.add("hidden");
+        el.app.classList.remove("hidden");
+        buildCharacterCards();
+        executedCount = 0;
+        viewIndex = 0;
+        stepResults.fill(null);
+        el.logBody.innerHTML = "";
+        await refreshRibbon();
+        await goNext();
+      } catch (err) {
+        showSetupError(describeRevert(err));
+      } finally {
+        el.btnStartDemo.disabled = false;
+      }
+    }
+
+    async function restartDemo() {
+      if (!window.confirm("¿Reiniciar la demo? Se desplegará un nuevo contrato y se perderá el historial actual.")) {
+        return;
+      }
+      const ok = await ensureTurn("banco", "turnGateStep", () => restartDemo(), "reiniciar la demo");
+      if (!ok) return;
+
+      setButtonsBusy(true);
+      try {
+        el.logBody.innerHTML = "";
+        await deployFreshContract();
+        executedCount = 0;
+        viewIndex = 0;
+        stepResults.fill(null);
+        await refreshRibbon();
+        await goNext();
+      } catch (err) {
+        appendLog({
+          paso: "—", persona: CHARACTERS.banco.name, cuenta: CHARACTERS.banco.address,
+          funcion: "deploy", resultado: "❌", mensaje: describeRevert(err),
+        });
+      } finally {
+        setButtonsBusy(false);
+      }
+    }
+
+    // ---------------------------------------------------------------------
+    // Bindings
+    // ---------------------------------------------------------------------
+
+    function bind(elm, handler) {
+      elm.addEventListener("click", async () => {
+        try {
+          await handler();
+        } catch (err) {
+          appendLog({
+            paso: "—", persona: "—", cuenta: "", funcion: "(error)",
+            resultado: "❌", mensaje: describeRevert(err),
+          });
+        }
+      });
+    }
+
+    // Los botones de la tarjeta de configuración muestran sus errores en un banner
+    // visible (#setupError) en vez del log del sistema, que todavía está oculto ahí.
+    function bindSetup(elm, handler) {
+      elm.addEventListener("click", async () => {
+        clearSetupError();
+        try {
+          await handler();
+        } catch (err) {
+          showSetupError(describeRevert(err));
+        }
+      });
+    }
+
+    bindSetup(el.btnConnect, connectWallet);
+    bindSetup(el.btnSwitch, switchToHardhatNetwork);
+    bindSetup(el.btnStartDemo, startDemo);
+    bind(el.btnNext, goNext);
+    bind(el.btnPrev, () => goPrev());
+    bind(el.btnRestart, restartDemo);
+
+    detectExistingConnection();
+  </script>
+</body>
+</html>
